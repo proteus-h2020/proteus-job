@@ -36,7 +36,7 @@ import org.apache.flink.streaming.connectors.kafka.testutils.JobManagerCommunica
 import org.apache.flink.streaming.util.serialization.{KeyedSerializationSchemaWrapper, TypeInformationSerializationSchema}
 import org.apache.flink.test.util.SuccessException
 import org.apache.flink.testutils.junit.RetryOnException
-import org.junit.{After, BeforeClass, Test}
+import org.junit.{AfterClass, BeforeClass, Test}
 import org.scalatest.junit.JUnitSuiteLike
 
 import scala.concurrent.duration.FiniteDuration
@@ -147,9 +147,6 @@ class KafkaIntegrationITSuite
 
   }
 
-  @After
-  def shutdown = KafkaTestBase.shutDownServices()
-
 
 }
 
@@ -157,6 +154,9 @@ object KafkaIntegrationITSuite {
 
   @BeforeClass
   def prepare = KafkaTestBase.prepare()
+
+  @AfterClass
+  def shutdown = KafkaTestBase.shutDownServices()
 
   private def extractField(field: String): Field = {
     val f = classOf[KafkaTestBase].getDeclaredField(field)
