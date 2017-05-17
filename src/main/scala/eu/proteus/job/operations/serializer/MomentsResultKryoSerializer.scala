@@ -14,22 +14,19 @@
  * limitations under the License.
  */
 
-package eu.proteus.job.operations.data.results
+package eu.proteus.job.operations.serializer
 
-import net.liftweb.json.DefaultFormats
-import net.liftweb.json.Serialization.write
+import com.esotericsoftware.kryo.io.{Input, Output}
+import com.esotericsoftware.kryo.{Kryo, Serializer}
+import eu.proteus.job.operations.data.results.MomentsResult
 
-case class MomentsResult(
-    coilId: Int,
-    varId: Int,
-    mean: Double,
-    variance: Double,
-    counter: Double
-  ) extends Serializable {
 
-  def toJson: String = {
-    implicit val formats = DefaultFormats
-    write(this)
+class MomentsResultKryoSerializer extends Serializer[MomentsResult] {
+  override def read(kryo: Kryo, input: Input, t: Class[MomentsResult]): MomentsResult = {
+    throw new UnsupportedOperationException
   }
 
+  override def write(kryo: Kryo, output: Output, obj: MomentsResult): Unit = {
+    output.writeString(obj.toJson)
+  }
 }

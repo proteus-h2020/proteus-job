@@ -22,6 +22,7 @@ import java.util.{Properties, UUID}
 import eu.proteus.job.operations.data.model.{CoilMeasurement, SensorMeasurement1D, SensorMeasurement2D}
 import eu.proteus.job.operations.data.results.MomentsResult
 import eu.proteus.job.operations.serializer.CoilMeasurementKryoSerializer
+import grizzled.slf4j.Logger
 import kafka.common.NotLeaderForPartitionException
 import org.apache.flink.api.common.restartstrategy.RestartStrategies
 import org.apache.flink.api.common.typeinfo.TypeInformation
@@ -50,21 +51,23 @@ class MomentsITSuite
 
   import MomentsITSuite._
 
+  private [moments] val LOG = Logger(getClass)
+
+
   @Test
   def runSimpleMomentsIntegrationWithKafka(): Unit = {
 
     val topic = "kafkaProducerConsumerTopic_" + UUID.randomUUID.toString
 
-    val parallelism = 1
-    val elementsPerPartition = 100
-    val totalElements = parallelism * elementsPerPartition
+    val sourceAndSinkparallelism = 1
+    val momentsParallelism = 4
 
     JobManagerCommunicationUtils.waitUntilNoJobIsRunning(flink.getLeaderGateway(timeout))
 
-    kafkaServer.createTestTopic(topic, parallelism, 1)
+    kafkaServer.createTestTopic(topic, sourceAndSinkparallelism, 1)
 
     val env = StreamExecutionEnvironment.getExecutionEnvironment
-    env.setParallelism(parallelism)
+    env.setParallelism(sourceAndSinkparallelism)
     env.enableCheckpointing(500)
     env.setRestartStrategy(RestartStrategies.noRestart) // fail immediately
 
@@ -79,11 +82,21 @@ class MomentsITSuite
 
     // ----------- add producer dataflow ----------
 
-    val s1 = SensorMeasurement1D(0, 12.0, 0 to 0, FlinkDenseVector(1.0))
-    val s2 = SensorMeasurement2D(0, 12.0, 1.0, 0 to 0, FlinkDenseVector(1.5))
+    val s = Seq(
+        SensorMeasurement1D(0, 12.0, 0 to 0, FlinkDenseVector(1.0)),
+        SensorMeasurement2D(1, 12.0, 1.0, 1 to 1, FlinkDenseVector(1.2)),
+        SensorMeasurement1D(4, 12.0, 0 to 0, FlinkDenseVector(1.5)),
+        SensorMeasurement2D(1, 12.0, 1.6, 1 to 1, FlinkDenseVector(1.1)),
+        SensorMeasurement1D(0, 12.0, 0 to 0, FlinkDenseVector(1.0)),
+        SensorMeasurement2D(2, 12.0, 2.4, 3 to 3, FlinkDenseVector(1.2)),
+        SensorMeasurement1D(2, 12.0, 3 to 3, FlinkDenseVector(1.0)),
+        SensorMeasurement1D(4, 12.0, 0 to 0, FlinkDenseVector(1.4)),
+        SensorMeasurement1D(2, 12.0, 3 to 3, FlinkDenseVector(1.0))
+    )
     val stream = env.addSource((ctx: SourceContext[CoilMeasurement]) => {
-      ctx.collect(s1)
-      ctx.collect(s2)
+      for (m <- s) {
+        ctx.collect(m)
+      }
     })
 
     val producerProperties = FlinkKafkaProducerBase.getPropertiesFromBrokerList(brokerConnectionStrings)
@@ -104,40 +117,41 @@ class MomentsITSuite
     props.putAll(secureProps)
 
     val source = kafkaServer.getConsumer(topic, schema, props)
-    val consuming = env.addSource(source)
+    val consuming = env.addSource(source).setParallelism(sourceAndSinkparallelism)
 
-    env.setParallelism(parallelism)
+    env.setParallelism(momentsParallelism)
 
     val result = MomentsOperation.runSimpleMomentsAnalytics(consuming, 53)
 
     result.addSink(new SinkFunction[MomentsResult]() {
       var e = 0
       override def invoke(in: MomentsResult): Unit = {
-
         e += 1
-        if (e == 2) {
+        val v = in.toJson
+        if (e == 5) {
           throw new SuccessException
         }
       }
-    }).setParallelism(1)
+    }).setParallelism(sourceAndSinkparallelism)
 
-    try
-      KafkaTestBase.tryExecutePropagateExceptions(env.getJavaEnv, "runSimpleIntegrationTest")
-    catch {
+    try {
+      LOG.info(env.getExecutionPlan)
+      KafkaTestBase.tryExecutePropagateExceptions(env.getJavaEnv, "runSimpleMomentsIT")
+    } catch {
       case e@(_: ProgramInvocationException | _: JobExecutionException) =>
         // look for NotLeaderForPartitionException
         var cause = e.getCause
         // search for nested SuccessExceptions
         var depth = 0
         while ( {
-          cause != null && {
-            depth += 1;
-            depth - 1
-          } < 20
-        }) {
-          if (cause.isInstanceOf[NotLeaderForPartitionException])
-            throw cause.asInstanceOf[Exception]
-          cause = cause.getCause
+            cause != null && {
+              depth += 1;
+              depth - 1
+            } < 20
+          }) {
+            if (cause.isInstanceOf[NotLeaderForPartitionException])
+              throw cause.asInstanceOf[Exception]
+            cause = cause.getCause
         }
         throw e
     }

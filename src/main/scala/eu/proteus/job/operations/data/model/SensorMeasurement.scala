@@ -10,7 +10,7 @@ trait CoilMeasurement extends StreamEvent {
 case class SensorMeasurement1D(
     coilId: Int,
     x: Double,
-    slice: IndexedSeq[Int],
+    var slice: IndexedSeq[Int],
     data: Vector
   ) extends CoilMeasurement
 
@@ -18,6 +18,6 @@ case class SensorMeasurement2D(
     coilId: Int,
     x: Double,
     y: Double,
-    slice: IndexedSeq[Int],
+    var slice: IndexedSeq[Int],
     data: Vector
   ) extends CoilMeasurement

@@ -39,7 +39,9 @@ object MomentsOperation {
           .asInstanceOf[DataStream[(CoilMeasurement)]]
           .map(
           (coilMeasurement: CoilMeasurement) => {
-            (coilMeasurement, coilMeasurement.coilId * featuresCount + coilMeasurement.slice.head)
+            val sensorId = coilMeasurement.slice.head
+            coilMeasurement.slice = 0 to 0
+            (coilMeasurement, coilMeasurement.coilId * featuresCount + sensorId)
             }
           )
           .keyBy(x => x._2)
@@ -48,11 +50,14 @@ object MomentsOperation {
 
     val moments = momentsEstimator.transform(stream)
 
-    moments.map((t) => {
+    moments.flatMap((t, out) => {
       val (pid: Int, metrics: MomentsEstimator.Moments) = t
-      val cid = pid % featuresCount
-      val sid = pid / featuresCount
-      MomentsResult(cid, sid, metrics.mean(0), metrics.variance(0), metrics.counter(0))
+      val variance = metrics.variance(0)
+      if (!java.lang.Double.isNaN(variance)) {
+        val cid = pid % featuresCount
+        val sid = pid / featuresCount
+        out.collect(MomentsResult(cid, sid, metrics.mean(0), variance, metrics.counter(0)))
+      }
     })
 
   }
