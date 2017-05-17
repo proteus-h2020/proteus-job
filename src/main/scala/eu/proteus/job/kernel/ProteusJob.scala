@@ -19,7 +19,9 @@ package eu.proteus.job.kernel
 import java.util.Properties
 
 import eu.proteus.job.operations.data.model.{CoilMeasurement, SensorMeasurement1D, SensorMeasurement2D}
-import eu.proteus.job.operations.serializer.CoilMeasurementKryoSerializer
+import eu.proteus.job.operations.data.results.MomentsResult
+import eu.proteus.job.operations.moments.MomentsOperation
+import eu.proteus.job.operations.serializer.{CoilMeasurementKryoSerializer, MomentsResultKryoSerializer}
 import grizzled.slf4j.Logger
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.java.utils.ParameterTool
@@ -60,6 +62,7 @@ object ProteusJob {
     env.getConfig.registerTypeWithKryoSerializer(classOf[CoilMeasurement], classOf[CoilMeasurementKryoSerializer])
     env.getConfig.registerTypeWithKryoSerializer(classOf[SensorMeasurement2D], classOf[CoilMeasurementKryoSerializer])
     env.getConfig.registerTypeWithKryoSerializer(classOf[SensorMeasurement1D], classOf[CoilMeasurementKryoSerializer])
+    env.getConfig.registerTypeWithKryoSerializer(classOf[MomentsResult], classOf[MomentsResultKryoSerializer])
   }
 
   def startProteusJob(parameters: ParameterTool) = {
@@ -74,22 +77,26 @@ object ProteusJob {
     // create the job
 
     // type info & serializer
-    val typeInfo = TypeInformation.of(classOf[CoilMeasurement])
-    val schema = new TypeInformationSerializationSchema[CoilMeasurement](typeInfo, env.getConfig)
+    val inputTypeInfo = TypeInformation.of(classOf[CoilMeasurement])
+    val inputSchema = new TypeInformationSerializationSchema[CoilMeasurement](inputTypeInfo, env.getConfig)
 
     // add kafka source
 
     val source: DataStream[CoilMeasurement] = env.addSource(new FlinkKafkaConsumer010[CoilMeasurement](
         realtimeDataKafkaTopic,
-        schema,
+        inputSchema,
         kafkaProperties))
 
-    // add here your analytics
-    // add Kafka sink 1st analytic algo
+    // simple moments
+
+    val moments = MomentsOperation.runSimpleMomentsAnalytics(source, 53)
+    val momentsTypeInfo = TypeInformation.of(classOf[MomentsResult])
+    val momentsSinkSchema = new TypeInformationSerializationSchema[MomentsResult](momentsTypeInfo, env.getConfig)
+
     val producerCfg = FlinkKafkaProducer010.writeToKafkaWithTimestamps(
-        source.javaStream,
-        "topic",
-        schema,
+        moments.javaStream,
+        "simple-moments",
+        momentsSinkSchema,
         kafkaProperties)
 
     producerCfg.setLogFailuresOnly(false)
@@ -108,7 +115,7 @@ object ProteusJob {
 
   }
 
-  def main(args: Array[String]) = {
+  def main(args: Array[String]): Unit = {
 
     var parameters: ParameterTool = null
     try {

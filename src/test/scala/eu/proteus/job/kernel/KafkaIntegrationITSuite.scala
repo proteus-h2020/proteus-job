@@ -136,9 +136,9 @@ class KafkaIntegrationITSuite
             depth - 1
           } < 20
         }) {
-          if (cause.isInstanceOf[NotLeaderForPartitionException])
-            throw cause.asInstanceOf[Exception]
-          cause = cause.getCause
+            if (cause.isInstanceOf[NotLeaderForPartitionException])
+              throw cause.asInstanceOf[Exception]
+            cause = cause.getCause
         }
         throw e
     }
