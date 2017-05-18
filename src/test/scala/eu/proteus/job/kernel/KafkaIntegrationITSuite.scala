@@ -152,12 +152,6 @@ class KafkaIntegrationITSuite
 
 object KafkaIntegrationITSuite {
 
-  @BeforeClass
-  def prepare = KafkaTestBase.prepare()
-
-  @AfterClass
-  def shutdown = KafkaTestBase.shutDownServices()
-
   private def extractField(field: String): Field = {
     val f = classOf[KafkaTestBase].getDeclaredField(field)
     f.setAccessible(true)
