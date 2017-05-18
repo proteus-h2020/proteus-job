@@ -127,7 +127,7 @@ class MomentsITSuite
       override def invoke(in: MomentsResult): Unit = {
         e += 1
         val v = in.toJson
-        if (e == 5) {
+        if (e == s.length) {
           throw new SuccessException
         }
       }
@@ -163,12 +163,6 @@ class MomentsITSuite
 }
 
 object MomentsITSuite {
-
-  @BeforeClass
-  def prepare = KafkaTestBase.prepare()
-
-  @AfterClass
-  def shutdown = KafkaTestBase.shutDownServices()
 
   private def extractField(field: String): Field = {
     val f = classOf[KafkaTestBase].getDeclaredField(field)
