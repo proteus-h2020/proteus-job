@@ -19,13 +19,13 @@ package eu.proteus.job.operations.data.results
 import net.liftweb.json.DefaultFormats
 import net.liftweb.json.Serialization.write
 
-case class MomentsResult(
-    coilId: Int,
-    varId: Int,
-    mean: Double,
-    variance: Double,
-    counter: Double
-  ) extends Serializable {
+trait MomentsResult extends Serializable {
+
+  def coilId: Int
+  def varId: Int
+  def mean: Double
+  def variance: Double
+  def counter: Double
 
   def toJson: String = {
     implicit val formats = DefaultFormats
@@ -33,3 +33,23 @@ case class MomentsResult(
   }
 
 }
+
+case class MomentsResult1D(
+  coilId: Int,
+  varId: Int,
+  x: Double,
+  mean: Double,
+  variance: Double,
+  counter: Double) extends MomentsResult
+
+
+case class MomentsResult2D(
+  coilId: Int,
+  varId: Int,
+  x: Double,
+  y: Double,
+  mean: Double,
+  variance: Double,
+  counter: Double) extends MomentsResult
+
+

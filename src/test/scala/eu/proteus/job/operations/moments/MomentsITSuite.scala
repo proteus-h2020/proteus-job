@@ -53,7 +53,6 @@ class MomentsITSuite
 
   private [moments] val LOG = Logger(getClass)
 
-
   @Test
   def runSimpleMomentsIntegrationWithKafka(): Unit = {
 
@@ -84,14 +83,14 @@ class MomentsITSuite
 
     val s = Seq(
         SensorMeasurement1D(0, 12.0, 0 to 0, FlinkDenseVector(1.0)),
-        SensorMeasurement2D(1, 12.0, 1.0, 1 to 1, FlinkDenseVector(1.2)),
-        SensorMeasurement1D(4, 12.0, 0 to 0, FlinkDenseVector(1.5)),
-        SensorMeasurement2D(1, 12.0, 1.6, 1 to 1, FlinkDenseVector(1.1)),
-        SensorMeasurement1D(0, 12.0, 0 to 0, FlinkDenseVector(1.0)),
-        SensorMeasurement2D(2, 12.0, 2.4, 3 to 3, FlinkDenseVector(1.2)),
-        SensorMeasurement1D(2, 12.0, 3 to 3, FlinkDenseVector(1.0)),
-        SensorMeasurement1D(4, 12.0, 0 to 0, FlinkDenseVector(1.4)),
-        SensorMeasurement1D(2, 12.0, 3 to 3, FlinkDenseVector(1.0))
+        SensorMeasurement2D(1, 13.0, 1.0, 1 to 1, FlinkDenseVector(1.2)),
+        SensorMeasurement1D(4, 14.0, 0 to 0, FlinkDenseVector(1.5)),
+        SensorMeasurement2D(1, 17.0, 1.6, 1 to 1, FlinkDenseVector(1.1)),
+        SensorMeasurement1D(0, 18.0, 0 to 0, FlinkDenseVector(1.0)),
+        SensorMeasurement2D(2, 19.0, 2.4, 3 to 3, FlinkDenseVector(1.2)),
+        SensorMeasurement1D(2, 20.0, 3 to 3, FlinkDenseVector(1.0)),
+        SensorMeasurement1D(4, 21.0, 0 to 0, FlinkDenseVector(1.4)),
+        SensorMeasurement1D(2, 22.0, 3 to 3, FlinkDenseVector(1.0))
     )
     val stream = env.addSource((ctx: SourceContext[CoilMeasurement]) => {
       for (m <- s) {
