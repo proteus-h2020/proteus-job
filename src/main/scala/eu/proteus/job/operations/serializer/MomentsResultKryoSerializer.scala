@@ -18,15 +18,64 @@ package eu.proteus.job.operations.serializer
 
 import com.esotericsoftware.kryo.io.{Input, Output}
 import com.esotericsoftware.kryo.{Kryo, Serializer}
-import eu.proteus.job.operations.data.results.MomentsResult
+import eu.proteus.job.operations.data.results.{MomentsResult, MomentsResult1D, MomentsResult2D}
 
 
 class MomentsResultKryoSerializer extends Serializer[MomentsResult] {
+
   override def read(kryo: Kryo, input: Input, t: Class[MomentsResult]): MomentsResult = {
-    throw new UnsupportedOperationException
+
+    val magicNumber = input.readInt()
+    assert(magicNumber == MAGIC_NUMBER)
+
+    val coilId = input.readInt()
+    val varId = input.readInt()
+
+    val mtype = input.readByte()
+    val x = input.readDouble()
+
+    val y = if (mtype == MOMENTS_RESULT_2D) {
+      input.readDouble()
+    } else {
+      0.0
+    }
+
+    val mean = input.readDouble()
+    val variance = input.readDouble()
+    val counter = input.readDouble()
+
+    if (mtype == MOMENTS_RESULT_2D) {
+      MomentsResult2D(coilId, varId, x, y, mean, variance, counter)
+    } else if (mtype == MOMENTS_RESULT_1D) {
+      MomentsResult1D(coilId, varId, x, mean, variance, counter)
+    } else {
+      throw new UnsupportedOperationException
+    }
+
   }
 
   override def write(kryo: Kryo, output: Output, obj: MomentsResult): Unit = {
-    output.writeString(obj.toJson)
+
+    output.writeInt(MAGIC_NUMBER)
+
+    output.writeInt(obj.coilId)
+    output.writeInt(obj.varId)
+
+    obj match {
+      case m1d: MomentsResult1D => {
+        output.writeByte(MOMENTS_RESULT_1D)
+        output.writeDouble(m1d.x)
+      }
+      case m2d: MomentsResult2D => {
+        output.writeByte(MOMENTS_RESULT_2D)
+        output.writeDouble(m2d.x)
+        output.writeDouble(m2d.y)
+      }
+    }
+
+    output.writeDouble(obj.mean)
+    output.writeDouble(obj.variance)
+    output.writeDouble(obj.counter)
+
   }
 }

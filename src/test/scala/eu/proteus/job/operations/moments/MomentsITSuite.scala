@@ -20,7 +20,6 @@ import java.lang.reflect.Field
 import java.util.{Properties, UUID}
 
 import eu.proteus.job.operations.data.model.{CoilMeasurement, SensorMeasurement1D, SensorMeasurement2D}
-import eu.proteus.job.operations.data.results.MomentsResult
 import eu.proteus.job.operations.serializer.CoilMeasurementKryoSerializer
 import grizzled.slf4j.Logger
 import kafka.common.NotLeaderForPartitionException
@@ -38,7 +37,7 @@ import org.apache.flink.streaming.connectors.kafka.testutils.JobManagerCommunica
 import org.apache.flink.streaming.util.serialization.{KeyedSerializationSchemaWrapper, TypeInformationSerializationSchema}
 import org.apache.flink.test.util.SuccessException
 import org.apache.flink.testutils.junit.RetryOnException
-import org.junit.{AfterClass, BeforeClass, Test}
+import org.junit.Test
 import org.scalatest.junit.JUnitSuiteLike
 
 import scala.concurrent.duration.FiniteDuration
@@ -122,11 +121,10 @@ class MomentsITSuite
 
     val result = MomentsOperation.runSimpleMomentsAnalytics(consuming, 53)
 
-    result.addSink(new SinkFunction[MomentsResult]() {
+    result.addSink(new SinkFunction[String]() {
       var e = 0
-      override def invoke(in: MomentsResult): Unit = {
+      override def invoke(in: String): Unit = {
         e += 1
-        val v = in.toJson
         if (e == s.length) {
           throw new SuccessException
         }

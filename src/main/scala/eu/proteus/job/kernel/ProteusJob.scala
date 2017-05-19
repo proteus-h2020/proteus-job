@@ -29,7 +29,7 @@ import org.apache.flink.contrib.streaming.state.{PredefinedOptions, RocksDBState
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer010, FlinkKafkaProducer010}
-import org.apache.flink.streaming.util.serialization.TypeInformationSerializationSchema
+import org.apache.flink.streaming.util.serialization.{SimpleStringSchema, TypeInformationSerializationSchema}
 
 
 object ProteusJob {
@@ -91,7 +91,9 @@ object ProteusJob {
 
     val moments = MomentsOperation.runSimpleMomentsAnalytics(source, 53)
     val momentsTypeInfo = TypeInformation.of(classOf[MomentsResult])
-    val momentsSinkSchema = new TypeInformationSerializationSchema[MomentsResult](momentsTypeInfo, env.getConfig)
+//  val momentsSinkSchema = new TypeInformationSerializationSchema[MomentsResult](momentsTypeInfo, env.getConfig)
+
+    val momentsSinkSchema = new SimpleStringSchema()
 
     val producerCfg = FlinkKafkaProducer010.writeToKafkaWithTimestamps(
         moments.javaStream,

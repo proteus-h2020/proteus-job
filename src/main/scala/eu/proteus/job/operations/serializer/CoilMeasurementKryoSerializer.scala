@@ -24,7 +24,6 @@ import org.apache.flink.ml.math.{DenseVector => FlinkDenseVector}
 
 class CoilMeasurementKryoSerializer extends Serializer[CoilMeasurement] {
 
-  private val MAGIC_NUMBER = 0x00687691 // PROTEUS EU id
 
   override def read(kryo: Kryo, input: Input, t: Class[CoilMeasurement]): CoilMeasurement = {
 
@@ -55,12 +54,12 @@ class CoilMeasurementKryoSerializer extends Serializer[CoilMeasurement] {
     output.writeInt(MAGIC_NUMBER)
     val sm = obj match {
       case s1d: SensorMeasurement1D =>
-        output.writeByte(0x00)
+        output.writeByte(COIL_MEASUREMENT_1D)
         output.writeInt(obj.coilId)
         output.writeDouble(s1d.x)
         s1d
       case s2d: SensorMeasurement2D =>
-        output.writeByte(0x01)
+        output.writeByte(COIL_MEASUREMENT_2D)
         output.writeInt(obj.coilId)
         output.writeDouble(s2d.x)
         output.writeDouble(s2d.y)
