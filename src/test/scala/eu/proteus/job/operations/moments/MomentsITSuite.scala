@@ -125,7 +125,7 @@ class MomentsITSuite
       var e = 0
       override def invoke(in: String): Unit = {
         e += 1
-        if (e == s.length) {
+        if (e == 5) {
           throw new SuccessException
         }
       }
