@@ -100,8 +100,8 @@ object MomentsOperation {
             ox: Option[Double], oy: Option[Double], out: Collector[MomentsResult]
         ): Unit = {
           val result = oy match {
-            case Some(y) => MomentsResult2D(cid, sid, metrics.mean(0), ox.get, y, metrics.variance(0), metrics.counter(0))
-            case None => MomentsResult1D(cid, sid, metrics.mean(0), ox.get, metrics.variance(0), metrics.counter(0))
+            case Some(y) => MomentsResult2D(cid, sid, ox.get, y, metrics.mean(0), metrics.variance(0), metrics.counter(0))
+            case None => MomentsResult1D(cid, sid, ox.get, metrics.mean(0), metrics.variance(0), metrics.counter(0))
           }
           out.collect(result)
         }
