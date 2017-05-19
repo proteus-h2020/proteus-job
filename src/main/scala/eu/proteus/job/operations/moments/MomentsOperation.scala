@@ -33,7 +33,7 @@ object MomentsOperation {
   def runSimpleMomentsAnalytics(
       stream: DataStream[CoilMeasurement],
       featuresCount: Int
-  ): DataStream[MomentsResult] = {
+  ): DataStream[String] = {
 
     implicit val typeInfo = TypeInformation.of(classOf[(CoilMeasurement, Int)])
 
@@ -118,7 +118,7 @@ object MomentsOperation {
             val momentsQueue = earlyMoments.get(pid)
             if (momentsQueue.nonEmpty) {
               val m = momentsQueue.dequeue
-              if (!java.lang.Double.isNaN(m.variance(0))) {
+              if (!m.variance(0).isNaN) {
                 joinAndOutput(m, cid, sid, coords._1, coords._2, out)
               }
             }
@@ -151,7 +151,7 @@ object MomentsOperation {
             momentsQueue += metrics
           } else {
             val (ox, oy) = coordsQueue.dequeue
-            if (!java.lang.Double.isNaN(metrics.variance(0))) {
+            if (!metrics.variance(0).isNaN) {
               joinAndOutput(metrics, cid, sid, ox, oy, out)
             }
           }
@@ -159,9 +159,8 @@ object MomentsOperation {
         }
 
     })
-    .name("coil-xy-join")
     .uid("coil-xy-join")
-
+    .map(x => x.toJson)
 
   }
 

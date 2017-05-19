@@ -20,6 +20,7 @@ import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.{Input, Output}
 import eu.proteus.job.operations.serializer.MomentsResultKryoSerializer
 import org.junit.runner.RunWith
+import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
 import org.scalatest.junit.JUnitRunner
 
@@ -47,10 +48,18 @@ class MomentsResultKryoSerializerUTSuite
     kryo.writeObject(out, m1D)
     kryo.writeObject(out, m2D)
 
-    an [UnsupportedOperationException] should be thrownBy {
-      kryo.readObject(in, classOf[MomentsResult])
-      kryo.readObject(in, classOf[MomentsResult])
+    val m1 = kryo.readObject(in, classOf[MomentsResult])
+
+    an [TestFailedException] should be thrownBy {
+      // NaN is not equal to NaN
+      m1 shouldEqual m1D
     }
+
+    m1.variance.isNaN shouldEqual m1D.variance.isNaN
+
+    val m2 = kryo.readObject(in, classOf[MomentsResult])
+    m2 shouldEqual m2D
+
 
   }
 
