@@ -25,10 +25,12 @@ mvn clean install
 mvn clean package -DskipTest
 ```
 
-This will produce a shaded jar called ```proteus-job_2.10-0.1-SNAPSHOT.jar``` in ```target/''' dir. This jar can be submitted to a proteus-engine cluster.
+This will produce a shaded jar called ```proteus-job_2.10-0.1-SNAPSHOT.jar``` in ```target/``` dir. This jar can be submitted to a proteus-engine cluster.
 
 ### How to run it
 
 ```
-./flink run <JOBS_PARAMS> proteus-job_2.10-0.1-SNAPSHOT.jar --boostrap-server <KAFKA_BOOTSTRAP_SERVER> --flink-checkpoints-dir <HDFS_PATH>
+./flink run <JOB_PARAMS> proteus-job_2.10-0.1-SNAPSHOT.jar --boostrap-server <KAFKA_BOOTSTRAP_SERVER> --flink-checkpoints-dir <HDFS_PATH>
 ```
+
+You find a complete list of JOB_PARAMS in [Flink documentation](https://ci.apache.org/projects/flink/flink-docs-release-1.3/setup/cli.html).
