@@ -18,7 +18,7 @@ package eu.proteus.job.operations.data.model
 
 import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.{Input, Output}
-import eu.proteus.job.operations.serializer.CoilMeasurementKryoSerializer
+import eu.proteus.job.operations.data.serializer.CoilMeasurementKryoSerializer
 import org.apache.flink.ml.math.{DenseVector => FlinkDenseVector}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner

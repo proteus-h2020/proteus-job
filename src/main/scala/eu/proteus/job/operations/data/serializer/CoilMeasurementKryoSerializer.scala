@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package eu.proteus.job.operations.serializer
+package eu.proteus.job.operations.data.serializer
 
 import com.esotericsoftware.kryo.io.{Input, Output}
 import com.esotericsoftware.kryo.{Kryo, Serializer}
@@ -22,8 +22,9 @@ import eu.proteus.job.operations.data.model.{CoilMeasurement, SensorMeasurement1
 import org.apache.flink.ml.math.{DenseVector => FlinkDenseVector}
 
 
-class CoilMeasurementKryoSerializer extends Serializer[CoilMeasurement] {
-
+class CoilMeasurementKryoSerializer
+  extends Serializer[CoilMeasurement]
+  with Serializable {
 
   override def read(kryo: Kryo, input: Input, t: Class[CoilMeasurement]): CoilMeasurement = {
 
