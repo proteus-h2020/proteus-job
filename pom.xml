@@ -422,6 +422,7 @@
 					<version>${log4j.version}</version>
 					<scope>provided</scope>
 				</dependency>
+
 			</dependencies>
 
 			<properties>
@@ -517,6 +518,8 @@
 									<exclude>com.data-artisans:frocksdbjni</exclude>
 									<exclude>io.netty:netty-all</exclude>
 									<exclude>io.netty:netty</exclude>
+									<exclude>com.esotericsoftware.kryo:kryo</exclude>
+									<exclude>com.esotericsoftware.minlog:minlog</exclude>
 									<exclude>commons-fileupload:commons-fileupload</exclude>
 									<exclude>org.apache.avro:avro</exclude>
 									<exclude>commons-collections:commons-collections</exclude>
@@ -524,8 +527,6 @@
 									<exclude>org.xerial.snappy:snappy-java</exclude>
 									<exclude>org.apache.commons:commons-compress</exclude>
 									<exclude>org.tukaani:xz</exclude>
-									<exclude>com.esotericsoftware.kryo:kryo</exclude>
-									<exclude>com.esotericsoftware.minlog:minlog</exclude>
 									<exclude>org.objenesis:objenesis</exclude>
 									<exclude>com.twitter:chill_*</exclude>
 									<exclude>com.twitter:chill-java</exclude>

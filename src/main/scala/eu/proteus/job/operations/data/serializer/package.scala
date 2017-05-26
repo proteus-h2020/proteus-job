@@ -1,8 +1,6 @@
-package eu.proteus.job.operations
-
+package eu.proteus.job.operations.data
 
 package object serializer {
-
 
   private [serializer] val MAGIC_NUMBER = 0x00687691 // PROTEUS EU id
 

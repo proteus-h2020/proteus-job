@@ -20,7 +20,8 @@ import java.lang.reflect.Field
 import java.util.{Properties, UUID}
 
 import eu.proteus.job.operations.data.model.{CoilMeasurement, SensorMeasurement1D, SensorMeasurement2D}
-import eu.proteus.job.operations.serializer.CoilMeasurementKryoSerializer
+import eu.proteus.job.operations.data.serializer.CoilMeasurementKryoSerializer
+import eu.proteus.job.operations.data.serializer.schema.UntaggedObjectSerializationSchema
 import grizzled.slf4j.Logger
 import kafka.common.NotLeaderForPartitionException
 import org.apache.flink.api.common.restartstrategy.RestartStrategies
@@ -75,8 +76,8 @@ class MomentsITSuite
     env.getConfig.registerTypeWithKryoSerializer(classOf[SensorMeasurement2D], classOf[CoilMeasurementKryoSerializer])
     env.getConfig.registerTypeWithKryoSerializer(classOf[SensorMeasurement1D], classOf[CoilMeasurementKryoSerializer])
 
-    val typeInfo = TypeInformation.of(classOf[CoilMeasurement])
-    val schema = new TypeInformationSerializationSchema[CoilMeasurement](typeInfo, env.getConfig)
+    implicit val typeInfo = TypeInformation.of(classOf[CoilMeasurement])
+    val schema = new UntaggedObjectSerializationSchema[CoilMeasurement](env.getConfig)
 
     // ----------- add producer dataflow ----------
 

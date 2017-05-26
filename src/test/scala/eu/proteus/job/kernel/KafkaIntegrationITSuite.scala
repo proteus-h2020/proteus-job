@@ -20,7 +20,9 @@ import java.lang.reflect.Field
 import java.util.{Properties, UUID}
 
 import eu.proteus.job.operations.data.model.{CoilMeasurement, SensorMeasurement1D, SensorMeasurement2D}
-import eu.proteus.job.operations.serializer.CoilMeasurementKryoSerializer
+import eu.proteus.job.operations.data.results.{MomentsResult, MomentsResult1D, MomentsResult2D}
+import eu.proteus.job.operations.data.serializer.schema.UntaggedObjectSerializationSchema
+import eu.proteus.job.operations.data.serializer.{CoilMeasurementKryoSerializer, MomentsResultKryoSerializer}
 import kafka.common.NotLeaderForPartitionException
 import org.apache.flink.api.common.restartstrategy.RestartStrategies
 import org.apache.flink.api.common.typeinfo.TypeInformation
@@ -36,7 +38,7 @@ import org.apache.flink.streaming.connectors.kafka.testutils.JobManagerCommunica
 import org.apache.flink.streaming.util.serialization.{KeyedSerializationSchemaWrapper, TypeInformationSerializationSchema}
 import org.apache.flink.test.util.SuccessException
 import org.apache.flink.testutils.junit.RetryOnException
-import org.junit.{AfterClass, BeforeClass, Test}
+import org.junit.Test
 import org.scalatest.junit.JUnitSuiteLike
 
 import scala.concurrent.duration.FiniteDuration
@@ -67,14 +69,28 @@ class KafkaIntegrationITSuite
     env.enableCheckpointing(500)
     env.setRestartStrategy(RestartStrategies.noRestart) // fail immediately
 
-    env.getConfig.disableSysoutLogging
+    val cfg = env.getConfig
 
-    env.getConfig.registerTypeWithKryoSerializer(classOf[CoilMeasurement], classOf[CoilMeasurementKryoSerializer])
-    env.getConfig.registerTypeWithKryoSerializer(classOf[SensorMeasurement2D], classOf[CoilMeasurementKryoSerializer])
-    env.getConfig.registerTypeWithKryoSerializer(classOf[SensorMeasurement1D], classOf[CoilMeasurementKryoSerializer])
+    cfg.disableSysoutLogging
 
-    val typeInfo = TypeInformation.of(classOf[CoilMeasurement])
-    val schema = new TypeInformationSerializationSchema[CoilMeasurement](typeInfo, env.getConfig)
+    // register types
+    cfg.registerKryoType(classOf[CoilMeasurement])
+    cfg.registerKryoType(classOf[SensorMeasurement2D])
+    cfg.registerKryoType(classOf[SensorMeasurement1D])
+    cfg.registerKryoType(classOf[MomentsResult])
+    cfg.registerKryoType(classOf[MomentsResult1D])
+    cfg.registerKryoType(classOf[MomentsResult2D])
+
+    // register serializers
+    cfg.addDefaultKryoSerializer(classOf[CoilMeasurement], classOf[CoilMeasurementKryoSerializer])
+    cfg.addDefaultKryoSerializer(classOf[SensorMeasurement2D], classOf[CoilMeasurementKryoSerializer])
+    cfg.addDefaultKryoSerializer(classOf[SensorMeasurement1D], classOf[CoilMeasurementKryoSerializer])
+    cfg.addDefaultKryoSerializer(classOf[MomentsResult], classOf[MomentsResultKryoSerializer])
+    cfg.addDefaultKryoSerializer(classOf[MomentsResult1D], classOf[MomentsResultKryoSerializer])
+    cfg.addDefaultKryoSerializer(classOf[MomentsResult2D], classOf[MomentsResultKryoSerializer])
+
+    implicit val typeInfo = TypeInformation.of(classOf[CoilMeasurement])
+    val schema = new UntaggedObjectSerializationSchema[CoilMeasurement](cfg)
 
     // ----------- add producer dataflow ----------
 

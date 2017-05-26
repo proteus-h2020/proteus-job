@@ -14,14 +14,16 @@
  * limitations under the License.
  */
 
-package eu.proteus.job.operations.serializer
+package eu.proteus.job.operations.data.serializer
 
 import com.esotericsoftware.kryo.io.{Input, Output}
 import com.esotericsoftware.kryo.{Kryo, Serializer}
 import eu.proteus.job.operations.data.results.{MomentsResult, MomentsResult1D, MomentsResult2D}
 
 
-class MomentsResultKryoSerializer extends Serializer[MomentsResult] {
+class MomentsResultKryoSerializer
+  extends Serializer[MomentsResult]
+  with Serializable {
 
   override def read(kryo: Kryo, input: Input, t: Class[MomentsResult]): MomentsResult = {
 

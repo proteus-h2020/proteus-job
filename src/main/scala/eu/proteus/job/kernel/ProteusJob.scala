@@ -19,9 +19,10 @@ package eu.proteus.job.kernel
 import java.util.Properties
 
 import eu.proteus.job.operations.data.model.{CoilMeasurement, SensorMeasurement1D, SensorMeasurement2D}
-import eu.proteus.job.operations.data.results.MomentsResult
+import eu.proteus.job.operations.data.results.{MomentsResult, MomentsResult1D, MomentsResult2D}
+import eu.proteus.job.operations.data.serializer.schema.UntaggedObjectSerializationSchema
 import eu.proteus.job.operations.moments.MomentsOperation
-import eu.proteus.job.operations.serializer.{CoilMeasurementKryoSerializer, MomentsResultKryoSerializer}
+import eu.proteus.job.operations.data.serializer.{CoilMeasurementKryoSerializer, MomentsResultKryoSerializer}
 import grizzled.slf4j.Logger
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.java.utils.ParameterTool
@@ -49,8 +50,7 @@ object ProteusJob {
     properties
   }
 
-  def configureFlinkEnvironment(env: StreamExecutionEnvironment) = {
-     // configure flink environement
+  def configureFlinkEnv(env: StreamExecutionEnvironment) = {
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
     val stateBackend = new RocksDBStateBackend(flinkCheckpointsDir, false)
@@ -59,11 +59,26 @@ object ProteusJob {
     // checkpoint every 20 mins, exactly once guarantee
     //env.enableCheckpointing(20 * 60 * 1000, CheckpointingMode.EXACTLY_ONCE)
 
-    env.getConfig.registerTypeWithKryoSerializer(classOf[CoilMeasurement], classOf[CoilMeasurementKryoSerializer])
-    env.getConfig.registerTypeWithKryoSerializer(classOf[SensorMeasurement2D], classOf[CoilMeasurementKryoSerializer])
-    env.getConfig.registerTypeWithKryoSerializer(classOf[SensorMeasurement1D], classOf[CoilMeasurementKryoSerializer])
-    env.getConfig.registerTypeWithKryoSerializer(classOf[MomentsResult], classOf[MomentsResultKryoSerializer])
+    val cfg = env.getConfig
+
+    // register types
+    cfg.registerKryoType(classOf[CoilMeasurement])
+    cfg.registerKryoType(classOf[SensorMeasurement2D])
+    cfg.registerKryoType(classOf[SensorMeasurement1D])
+    cfg.registerKryoType(classOf[MomentsResult])
+    cfg.registerKryoType(classOf[MomentsResult1D])
+    cfg.registerKryoType(classOf[MomentsResult2D])
+
+    // register serializers
+    env.addDefaultKryoSerializer(classOf[CoilMeasurement], classOf[CoilMeasurementKryoSerializer])
+    env.addDefaultKryoSerializer(classOf[SensorMeasurement2D], classOf[CoilMeasurementKryoSerializer])
+    env.addDefaultKryoSerializer(classOf[SensorMeasurement1D], classOf[CoilMeasurementKryoSerializer])
+    env.addDefaultKryoSerializer(classOf[MomentsResult], classOf[MomentsResultKryoSerializer])
+    env.addDefaultKryoSerializer(classOf[MomentsResult1D], classOf[MomentsResultKryoSerializer])
+    env.addDefaultKryoSerializer(classOf[MomentsResult2D], classOf[MomentsResultKryoSerializer])
+
   }
+
 
   def startProteusJob(parameters: ParameterTool) = {
 
@@ -72,13 +87,12 @@ object ProteusJob {
     // configure kafka
     val kafkaProperties = loadKafkaProperties
 
-    configureFlinkEnvironment(env)
-
     // create the job
+    configureFlinkEnv(env)
 
     // type info & serializer
-    val inputTypeInfo = TypeInformation.of(classOf[CoilMeasurement])
-    val inputSchema = new TypeInformationSerializationSchema[CoilMeasurement](inputTypeInfo, env.getConfig)
+    implicit val inputTypeInfo = createTypeInformation[CoilMeasurement]
+    val inputSchema = new UntaggedObjectSerializationSchema[CoilMeasurement](env.getConfig)
 
     // add kafka source
 
@@ -90,8 +104,8 @@ object ProteusJob {
     // simple moments
 
     val moments = MomentsOperation.runSimpleMomentsAnalytics(source, 53)
-    val momentsTypeInfo = TypeInformation.of(classOf[MomentsResult])
-//  val momentsSinkSchema = new TypeInformationSerializationSchema[MomentsResult](momentsTypeInfo, env.getConfig)
+//  implicit val momentsTypeInfo = createTypeInformation[MomentsResult]
+//  val momentsSinkSchema = new UntaggedObjectSerializationSchema[MomentsResult](env.getConfig)
 
     val momentsSinkSchema = new SimpleStringSchema()
 
@@ -112,8 +126,8 @@ object ProteusJob {
     System.out.println("The Flink Kafka Job")
     System.out.println("Parameters:")
     System.out.println("--boostrap-server\tKafka Bootstrap Server")
-    System.out.println("--flink-checkpoints-dir\tAn HDFS dir which that " +
-      "store rocksdb checkpoints, e.g., namenode:9000/flink-checkpoints/")
+    System.out.println("--flink-checkpoints-dir\tAn HDFS dir that " +
+      "stores rocksdb checkpoints, e.g., hdfs://namenode:9000/flink-checkpoints/")
 
   }
 
@@ -123,7 +137,7 @@ object ProteusJob {
     try {
       parameters = ParameterTool.fromArgs(args)
       kafkaBootstrapServer = parameters.getRequired("bootstrap-server")
-      flinkCheckpointsDir = "hdfs://" + parameters.getRequired("flink-checkpoints-dir")
+      flinkCheckpointsDir = parameters.getRequired("flink-checkpoints-dir")
     } catch {
       case t: Throwable =>
         LOG.error("Error parsing the command line!")

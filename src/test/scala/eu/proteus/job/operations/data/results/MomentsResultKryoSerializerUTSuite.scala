@@ -18,7 +18,7 @@ package eu.proteus.job.operations.data.results
 
 import com.esotericsoftware.kryo.Kryo
 import com.esotericsoftware.kryo.io.{Input, Output}
-import eu.proteus.job.operations.serializer.MomentsResultKryoSerializer
+import eu.proteus.job.operations.data.serializer.MomentsResultKryoSerializer
 import org.junit.runner.RunWith
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{BeforeAndAfterAll, Matchers, WordSpecLike}
