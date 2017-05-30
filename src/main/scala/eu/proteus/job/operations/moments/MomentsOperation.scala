@@ -140,7 +140,7 @@ object MomentsOperation {
           val cid = pid % featuresCount
           val sid = pid / featuresCount
           val coordsQueue = coordsMap.get(pid)
-          if (coordsQueue.isEmpty) {
+          if (coordsQueue == null || coordsQueue.isEmpty) {
             val momentsQueue = if (earlyMoments.contains(pid)) {
               earlyMoments.get(pid)
             } else {
