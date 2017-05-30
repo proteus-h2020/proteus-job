@@ -29,9 +29,10 @@ class CoilMeasurementKryoSerializer
   override def read(kryo: Kryo, input: Input, t: Class[CoilMeasurement]): CoilMeasurement = {
 
     val magicNumber = input.readInt()
-    assert(magicNumber == MAGIC_NUMBER)
+    assert(magicNumber == MAGIC_NUMBER, "unknown magic number")
     val measurementType = input.readByte()
-    assert(measurementType == COIL_MEASUREMENT_1D || measurementType == COIL_MEASUREMENT_2D)
+    assert(measurementType == COIL_MEASUREMENT_1D || measurementType == COIL_MEASUREMENT_2D,
+        "unknown coil type")
     val is2D = (measurementType & 0x01) == 1
     val coilId = input.readInt()
 
