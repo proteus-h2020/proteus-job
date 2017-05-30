@@ -30,7 +30,9 @@ class CoilMeasurementKryoSerializer
 
     val magicNumber = input.readInt()
     assert(magicNumber == MAGIC_NUMBER)
-    val is2D = (input.readByte() & 0x01) == 1
+    val measurementType = input.readByte()
+    assert(measurementType == COIL_MEASUREMENT_1D || measurementType == COIL_MEASUREMENT_2D)
+    val is2D = (measurementType & 0x01) == 1
     val coilId = input.readInt()
 
     val x = input.readDouble()
