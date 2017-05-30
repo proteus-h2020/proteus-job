@@ -7,7 +7,7 @@ This is the Flink Job that powers Proteus H2020 analytics stack.
 ```shell
 git clone https://github.com/proteus-h2020/proteus-engine -b proteus-dev
 cd proteus-engine
-mvn clean install -DskipTests
+mvn clean install -DskipTests # you may need to disable checkstyle mvn plugin
 cd flink-dist
 mvn clean install
 ```
@@ -30,7 +30,7 @@ This will produce a shaded jar called ```proteus-job_2.10-0.1-SNAPSHOT.jar``` in
 ### How to run it
 
 ```
-./flink run <JOB_PARAMS> proteus-job_2.10-0.1-SNAPSHOT.jar --boostrap-server <KAFKA_BOOTSTRAP_SERVER> --flink-checkpoints-dir <HDFS_PATH>
+./flink run <JOB_PARAMS> proteus-job_2.10-0.1-SNAPSHOT.jar --bootstrap-server <KAFKA_BOOTSTRAP_SERVER> --flink-checkpoints-dir <HDFS_PATH>
 ```
 
 You find a complete list of JOB_PARAMS in [Flink documentation](https://ci.apache.org/projects/flink/flink-docs-release-1.3/setup/cli.html).

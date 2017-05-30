@@ -125,7 +125,7 @@ object ProteusJob {
   def printUsage = {
     System.out.println("The Flink Kafka Job")
     System.out.println("Parameters:")
-    System.out.println("--boostrap-server\tKafka Bootstrap Server")
+    System.out.println("--bootstrap-server\tKafka Bootstrap Server")
     System.out.println("--flink-checkpoints-dir\tAn HDFS dir that " +
       "stores rocksdb checkpoints, e.g., hdfs://namenode:9000/flink-checkpoints/")
 
