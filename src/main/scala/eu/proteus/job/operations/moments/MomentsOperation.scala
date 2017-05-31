@@ -143,8 +143,8 @@ object MomentsOperation {
 
         override def flatMap2(in: (Int, MomentsEstimator.Moments), out: Collector[MomentsResult]): Unit = {
           val (pid: Int, metrics: MomentsEstimator.Moments) = in
-          val cid = pid % featuresCount
-          val sid = pid / featuresCount
+          val cid = pid / featuresCount
+          val sid = pid % featuresCount
           val coordsQueue = coordsMap.get(pid)
           if (coordsQueue == null || coordsQueue.isEmpty) {
             val momentsQueue = if (earlyMoments.contains(pid)) {
