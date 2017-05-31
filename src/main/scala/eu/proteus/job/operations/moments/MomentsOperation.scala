@@ -19,6 +19,7 @@ package eu.proteus.job.operations.moments
 import eu.proteus.job.operations.data.model.{CoilMeasurement, SensorMeasurement1D, SensorMeasurement2D}
 import eu.proteus.job.operations.data.results.{MomentsResult, MomentsResult1D, MomentsResult2D}
 import eu.proteus.solma.moments.MomentsEstimator
+import grizzled.slf4j.Logger
 import org.apache.flink.api.common.state.{MapState, MapStateDescriptor}
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.configuration.Configuration
@@ -29,6 +30,8 @@ import org.apache.flink.util.Collector
 import scala.collection.mutable
 
 object MomentsOperation {
+
+  private [moments] val LOG = Logger(getClass)
 
   def runSimpleMomentsAnalytics(
       stream: DataStream[CoilMeasurement],
@@ -49,6 +52,9 @@ object MomentsOperation {
           .map(
             (coilMeasurement: CoilMeasurement) => {
               val sensorId = coilMeasurement.slice.head
+              if (LOG.isDebugEnabled) {
+                LOG.debug("Reading sensor id %d for coil %d".format(sensorId, coilMeasurement.coilId))
+              }
               (coilMeasurement, coilMeasurement.coilId * featuresCount + sensorId)
             }
           )
@@ -160,8 +166,14 @@ object MomentsOperation {
 
     })
     .uid("coil-xy-join")
-    .map(x => x.toJson)
-
+//    .map(_.toJson)
+    .map(result => {
+      val ret = result.toJson
+      if (LOG.isDebugEnabled) {
+        LOG.debug("Sinking to kafka: " + ret)
+      }
+      ret
+    })
   }
 
 }

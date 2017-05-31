@@ -21,16 +21,15 @@ import java.util.Properties
 import eu.proteus.job.operations.data.model.{CoilMeasurement, SensorMeasurement1D, SensorMeasurement2D}
 import eu.proteus.job.operations.data.results.{MomentsResult, MomentsResult1D, MomentsResult2D}
 import eu.proteus.job.operations.data.serializer.schema.UntaggedObjectSerializationSchema
-import eu.proteus.job.operations.moments.MomentsOperation
 import eu.proteus.job.operations.data.serializer.{CoilMeasurementKryoSerializer, MomentsResultKryoSerializer}
+import eu.proteus.job.operations.moments.MomentsOperation
 import grizzled.slf4j.Logger
-import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.contrib.streaming.state.{PredefinedOptions, RocksDBStateBackend}
 import org.apache.flink.streaming.api.TimeCharacteristic
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer010, FlinkKafkaProducer010}
-import org.apache.flink.streaming.util.serialization.{SimpleStringSchema, TypeInformationSerializationSchema}
+import org.apache.flink.streaming.util.serialization.SimpleStringSchema
 
 
 object ProteusJob {
@@ -44,11 +43,19 @@ object ProteusJob {
   // flink config
   private [kernel] var flinkCheckpointsDir = ""
 
-  def loadKafkaProperties = {
+  def loadBaseKafkaProperties = {
     val properties = new Properties
     properties.setProperty("bootstrap.servers", kafkaBootstrapServer)
+//    properties.setProperty("group.id", "proteus-group")
     properties
   }
+
+  def loadConsumerKafkaProperties = {
+    val properties = loadBaseKafkaProperties
+//    properties.setProperty("auto.offset.reset", "earliest")
+    properties
+  }
+
 
   def configureFlinkEnv(env: StreamExecutionEnvironment) = {
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
@@ -84,9 +91,6 @@ object ProteusJob {
 
     val env = StreamExecutionEnvironment.getExecutionEnvironment
 
-    // configure kafka
-    val kafkaProperties = loadKafkaProperties
-
     // create the job
     configureFlinkEnv(env)
 
@@ -99,7 +103,7 @@ object ProteusJob {
     val source: DataStream[CoilMeasurement] = env.addSource(new FlinkKafkaConsumer010[CoilMeasurement](
         realtimeDataKafkaTopic,
         inputSchema,
-        kafkaProperties))
+        loadConsumerKafkaProperties))
 
     // simple moments
 
@@ -113,7 +117,7 @@ object ProteusJob {
         moments.javaStream,
         "simple-moments",
         momentsSinkSchema,
-        kafkaProperties)
+        loadBaseKafkaProperties)
 
     producerCfg.setLogFailuresOnly(false)
     producerCfg.setFlushOnCheckpoint(true)
