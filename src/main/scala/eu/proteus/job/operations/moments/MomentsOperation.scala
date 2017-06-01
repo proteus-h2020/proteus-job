@@ -36,7 +36,7 @@ object MomentsOperation {
   def runSimpleMomentsAnalytics(
       stream: DataStream[CoilMeasurement],
       featuresCount: Int
-  ): DataStream[String] = {
+  ): DataStream[MomentsResult] = {
 
     implicit val typeInfo = TypeInformation.of(classOf[(CoilMeasurement, Int)])
 
