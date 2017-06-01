@@ -23,25 +23,32 @@ import eu.proteus.job.operations.data.results.{MomentsResult, MomentsResult1D, M
 import eu.proteus.job.operations.data.serializer.schema.UntaggedObjectSerializationSchema
 import eu.proteus.job.operations.data.serializer.{CoilMeasurementKryoSerializer, MomentsResultKryoSerializer}
 import eu.proteus.job.operations.moments.MomentsOperation
+import eu.proteus.solma
 import grizzled.slf4j.Logger
 import org.apache.flink.api.java.utils.ParameterTool
 import org.apache.flink.contrib.streaming.state.{PredefinedOptions, RocksDBStateBackend}
-import org.apache.flink.streaming.api.TimeCharacteristic
+import org.apache.flink.runtime.state.memory.MemoryStateBackend
+import org.apache.flink.streaming.api.{CheckpointingMode, TimeCharacteristic}
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer010, FlinkKafkaProducer010}
 import org.apache.flink.streaming.util.serialization.SimpleStringSchema
+
+import scala.collection.mutable
 
 
 object ProteusJob {
 
   private [kernel] val LOG = Logger(getClass)
+  private [kernel] val ONE_MEGABYTE = 1024 * 1024
 
   // kafka config
   private [kernel] var kafkaBootstrapServer = "localhost:2181"
   private [kernel] var realtimeDataKafkaTopic = "proteus-realtime"
+  private [kernel] var jobStackBackendType = "memory"
 
   // flink config
   private [kernel] var flinkCheckpointsDir = ""
+  private [kernel] var memoryBackendMBSize = 20
 
   def loadBaseKafkaProperties = {
     val properties = new Properties
@@ -60,11 +67,20 @@ object ProteusJob {
   def configureFlinkEnv(env: StreamExecutionEnvironment) = {
     env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime)
 
-    val stateBackend = new RocksDBStateBackend(flinkCheckpointsDir, false)
-    stateBackend.setPredefinedOptions(PredefinedOptions.DEFAULT)
-    env.setStateBackend(stateBackend)
+    if (jobStackBackendType == "rocksdb") {
+      val stateBackend = new RocksDBStateBackend(flinkCheckpointsDir, false)
+//      stateBackend.setPredefinedOptions(PredefinedOptions.DEFAULT)
+      env.setStateBackend(stateBackend)
+    } else if (jobStackBackendType == "memory") {
+      val stateBackend = new MemoryStateBackend(memoryBackendMBSize * ONE_MEGABYTE, true)
+      env.setStateBackend(stateBackend)
+    } else {
+      throw new UnsupportedOperationException
+    }
+
+
     // checkpoint every 20 mins, exactly once guarantee
-    //env.enableCheckpointing(20 * 60 * 1000, CheckpointingMode.EXACTLY_ONCE)
+//    env.enableCheckpointing(10000, CheckpointingMode.EXACTLY_ONCE)
 
     val cfg = env.getConfig
 
@@ -75,6 +91,7 @@ object ProteusJob {
     cfg.registerKryoType(classOf[MomentsResult])
     cfg.registerKryoType(classOf[MomentsResult1D])
     cfg.registerKryoType(classOf[MomentsResult2D])
+    cfg.registerKryoType(classOf[solma.moments.MomentsEstimator.Moments])
 
     // register serializers
     env.addDefaultKryoSerializer(classOf[CoilMeasurement], classOf[CoilMeasurementKryoSerializer])
@@ -84,6 +101,8 @@ object ProteusJob {
     env.addDefaultKryoSerializer(classOf[MomentsResult1D], classOf[MomentsResultKryoSerializer])
     env.addDefaultKryoSerializer(classOf[MomentsResult2D], classOf[MomentsResultKryoSerializer])
 
+    env.addDefaultKryoSerializer(classOf[mutable.Queue[_]],
+      classOf[com.twitter.chill.TraversableSerializer[_, mutable.Queue[_]]])
   }
 
 
@@ -130,6 +149,8 @@ object ProteusJob {
     System.out.println("The Flink Kafka Job")
     System.out.println("Parameters:")
     System.out.println("--bootstrap-server\tKafka Bootstrap Server")
+    System.out.println("--state-backend\tFlink State Backend [memory|rocksdb]")
+    System.out.println("--state-backend-mbsize\tFlink Memory State Backend size in MB (default: 20)")
     System.out.println("--flink-checkpoints-dir\tAn HDFS dir that " +
       "stores rocksdb checkpoints, e.g., hdfs://namenode:9000/flink-checkpoints/")
 
@@ -141,7 +162,18 @@ object ProteusJob {
     try {
       parameters = ParameterTool.fromArgs(args)
       kafkaBootstrapServer = parameters.getRequired("bootstrap-server")
-      flinkCheckpointsDir = parameters.getRequired("flink-checkpoints-dir")
+
+      jobStackBackendType = parameters.get("state-backend")
+      assert(jobStackBackendType == "memory" || jobStackBackendType == "rocksdb")
+
+      if (jobStackBackendType == "rocksdb") {
+        flinkCheckpointsDir = parameters.getRequired("flink-checkpoints-dir")
+      }
+
+      if (jobStackBackendType == "memory") {
+        memoryBackendMBSize = parameters.getInt("state-backend-mbsize", 20)
+      }
+
     } catch {
       case t: Throwable =>
         LOG.error("Error parsing the command line!")
