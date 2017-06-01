@@ -88,15 +88,23 @@ object MomentsOperation {
 
         override def open(parameters: Configuration): Unit = {
           super.open(parameters)
+
+          val cfg = getRuntimeContext.getExecutionConfig
+          val keyType = createTypeInformation[Int]
+          val valueType1 = createTypeInformation[mutable.Queue[(Option[Double], Option[Double])]]
+          val valueType2 = createTypeInformation[mutable.Queue[MomentsEstimator.Moments]]
+
+          val s = valueType1.createSerializer(cfg)
+
           val coordsDescriptor = new MapStateDescriptor[Int, mutable.Queue[(Option[Double], Option[Double])]](
             "coords",
-            TypeInformation.of(classOf[Int]),
-            TypeInformation.of(classOf[mutable.Queue[(Option[Double], Option[Double])]])
+            keyType.createSerializer(cfg),
+            valueType1.createSerializer(cfg)
           )
           val momentsDescriptor = new MapStateDescriptor[Int, mutable.Queue[MomentsEstimator.Moments]](
             "moments",
-            TypeInformation.of(classOf[Int]),
-            TypeInformation.of(classOf[mutable.Queue[MomentsEstimator.Moments]])
+            keyType.createSerializer(cfg),
+            valueType2.createSerializer(cfg)
           )
           coordsMap = getRuntimeContext.getMapState(coordsDescriptor)
           earlyMoments = getRuntimeContext.getMapState(momentsDescriptor)
@@ -137,6 +145,7 @@ object MomentsOperation {
               q
             }
             coordsQueue += coords
+            coordsMap.put(pid, coordsQueue)
           }
 
         }
@@ -155,6 +164,7 @@ object MomentsOperation {
               q
             }
             momentsQueue += metrics
+            earlyMoments.put(pid, momentsQueue)
           } else {
             val (ox, oy) = coordsQueue.dequeue
             if (!metrics.variance(0).isNaN) {

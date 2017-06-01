@@ -386,6 +386,34 @@
 		</profile>
 
 		<profile>
+			<id>ide-testing</id>
+			<activation>
+				<activeByDefault>false</activeByDefault>
+			</activation>
+			<properties>
+				<suffix.test>(?&lt;!(IT|Integration))(Test|Suite|Case)</suffix.test>
+				<suffix.it>(IT|Integration)(Test|Suite|Case)</suffix.it>
+			</properties>
+			<dependencies>
+				<dependency>
+					<groupId>org.apache.flink</groupId>
+					<artifactId>flink-clients_${scala.binary.version}</artifactId>
+					<version>${flink.version}</version>
+					<exclusions>
+						<exclusion>
+							<groupId>log4j</groupId>
+							<artifactId>*</artifactId>
+						</exclusion>
+						<exclusion>
+							<groupId>org.slf4j</groupId>
+							<artifactId>slf4j-log4j12</artifactId>
+						</exclusion>
+					</exclusions>
+					</dependency>
+			</dependencies>
+		</profile>
+
+		<profile>
 			<!-- Profile for packaging correct JAR files -->
 			<id>build-jar</id>
 			<activation>

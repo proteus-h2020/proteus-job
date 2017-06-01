@@ -20,6 +20,7 @@ import java.lang.reflect.Field
 import java.util.{Properties, UUID}
 
 import eu.proteus.job.operations.data.model.{CoilMeasurement, SensorMeasurement1D, SensorMeasurement2D}
+import eu.proteus.job.operations.data.results.MomentsResult
 import eu.proteus.job.operations.data.serializer.CoilMeasurementKryoSerializer
 import eu.proteus.job.operations.data.serializer.schema.UntaggedObjectSerializationSchema
 import grizzled.slf4j.Logger
@@ -122,9 +123,9 @@ class MomentsITSuite
 
     val result = MomentsOperation.runSimpleMomentsAnalytics(consuming, 53)
 
-    result.addSink(new SinkFunction[String]() {
+    result.addSink(new SinkFunction[MomentsResult]() {
       var e = 0
-      override def invoke(in: String): Unit = {
+      override def invoke(in: MomentsResult): Unit = {
         e += 1
         if (e == 5) {
           throw new SuccessException
