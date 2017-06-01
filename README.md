@@ -27,10 +27,20 @@ mvn clean package -DskipTests
 
 This will produce a shaded jar called ```proteus-job_2.10-0.1-SNAPSHOT.jar``` in ```target/``` dir. This jar can be submitted to a proteus-engine cluster.
 
-### How to run it
+### How to run it on a cluster
 
 ```
-./flink run <JOB_PARAMS> proteus-job_2.10-0.1-SNAPSHOT.jar --bootstrap-server <KAFKA_BOOTSTRAP_SERVER> --flink-checkpoints-dir <HDFS_PATH>
+./flink run <JOB_PARAMS> proteus-job_2.10-0.1-SNAPSHOT.jar --bootstrap-server <KAFKA_BOOTSTRAP_SERVER>
 ```
 
 You find a complete list of JOB_PARAMS in [Flink documentation](https://ci.apache.org/projects/flink/flink-docs-release-1.3/setup/cli.html).
+
+#### Optional job-specific parameters
+
+1. **state-backend**	Flink State Backend [memory|rocksdb]
+2. **state-backend-mbsize**	Flink Memory State Backend size in MB (default: 20)
+3. **flink-checkpoints-dir** An valid directory in which Flink will stores Rocksdb checkpoints, e.g., hdfs://namenode:9000/flink-checkpoints/
+
+### How to run it within your IDE
+
+In order to local test your job within your IDe, you need to select ```ide-testing``` maven profile.
