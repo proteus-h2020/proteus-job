@@ -22,7 +22,7 @@ mvn clean install
 ### How to build
 
 ```shell
-mvn clean package -DskipTest
+mvn clean package -DskipTests
 ```
 
 This will produce a shaded jar called ```proteus-job_2.10-0.1-SNAPSHOT.jar``` in ```target/``` dir. This jar can be submitted to a proteus-engine cluster.

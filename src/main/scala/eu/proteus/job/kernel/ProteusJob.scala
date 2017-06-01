@@ -109,9 +109,9 @@ object ProteusJob {
 
     val moments = MomentsOperation.runSimpleMomentsAnalytics(source, 54)
 //  implicit val momentsTypeInfo = createTypeInformation[MomentsResult]
-//  val momentsSinkSchema = new UntaggedObjectSerializationSchema[MomentsResult](env.getConfig)
+    val momentsSinkSchema = new UntaggedObjectSerializationSchema[MomentsResult](env.getConfig)
 
-    val momentsSinkSchema = new SimpleStringSchema()
+    //val momentsSinkSchema = new SimpleStringSchema()
 
     val producerCfg = FlinkKafkaProducer010.writeToKafkaWithTimestamps(
         moments.javaStream,
