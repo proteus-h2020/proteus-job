@@ -107,7 +107,7 @@ object ProteusJob {
 
     // simple moments
 
-    val moments = MomentsOperation.runSimpleMomentsAnalytics(source, 53)
+    val moments = MomentsOperation.runSimpleMomentsAnalytics(source, 54)
 //  implicit val momentsTypeInfo = createTypeInformation[MomentsResult]
 //  val momentsSinkSchema = new UntaggedObjectSerializationSchema[MomentsResult](env.getConfig)
 
