@@ -167,13 +167,13 @@ object MomentsOperation {
     })
     .uid("coil-xy-join")
 //    .map(_.toJson)
-    .map(result => {
-      val ret = result.toJson
-      if (LOG.isDebugEnabled) {
-        LOG.debug("Sinking to kafka: " + ret)
-      }
-      ret
-    })
+//     .map(result => {
+//       val ret = result.toJson
+ //      if (LOG.isDebugEnabled) {
+ //        LOG.debug("Sinking to kafka: " + ret)
+//       }
+ //      ret
+   //  })
   }
 
 }
