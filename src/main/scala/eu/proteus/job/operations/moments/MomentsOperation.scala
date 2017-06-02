@@ -35,12 +35,12 @@ object MomentsOperation {
 
   def runSimpleMomentsAnalytics(
       stream: DataStream[CoilMeasurement],
-      featuresCount: Int
+      featuresCount: Long
   ): DataStream[MomentsResult] = {
 
-    implicit val typeInfo = TypeInformation.of(classOf[(CoilMeasurement, Int)])
+    implicit val typeInfo = TypeInformation.of(classOf[(CoilMeasurement, Long)])
 
-    var kstream: KeyedStream[(CoilMeasurement, Int), Int] = null
+    var kstream: KeyedStream[(CoilMeasurement, Long), Long] = null
 
     val momentsEstimator = MomentsEstimator()
       .setFeaturesCount(1)
@@ -55,7 +55,8 @@ object MomentsOperation {
               if (LOG.isDebugEnabled) {
                 LOG.debug("Reading sensor id %d for coil %d".format(sensorId, coilMeasurement.coilId))
               }
-              (coilMeasurement, coilMeasurement.coilId * featuresCount + sensorId)
+              val vkey = coilMeasurement.coilId.toLong * featuresCount + sensorId.toLong
+              (coilMeasurement, vkey)
             }
           )
           .keyBy(x => x._2)
@@ -71,37 +72,35 @@ object MomentsOperation {
           }
         )
         .keyBy(x => x._2)
-        .asInstanceOf[KeyedStream[(Any, Int), Int]]
+        .asInstanceOf[KeyedStream[(Any, Long), Long]]
       })
 
     val moments = momentsEstimator.transform(stream)
 
     kstream
       .connect(moments.keyBy(x => x._1))
-      .flatMap(new RichCoFlatMapFunction[(CoilMeasurement, Int), (Int, MomentsEstimator.Moments), MomentsResult]() {
+      .flatMap(new RichCoFlatMapFunction[(CoilMeasurement, Long), (Long, MomentsEstimator.Moments), MomentsResult]() {
 
         @transient
-        private var coordsMap: MapState[Int, mutable.Queue[(Option[Double], Option[Double])]] = _
+        private var coordsMap: MapState[Long, mutable.Queue[(Option[Double], Option[Double])]] = _
 
         @transient
-        private var earlyMoments: MapState[Int, mutable.Queue[MomentsEstimator.Moments]] = _
+        private var earlyMoments: MapState[Long, mutable.Queue[MomentsEstimator.Moments]] = _
 
         override def open(parameters: Configuration): Unit = {
           super.open(parameters)
 
           val cfg = getRuntimeContext.getExecutionConfig
-          val keyType = createTypeInformation[Int]
+          val keyType = createTypeInformation[Long]
           val valueType1 = createTypeInformation[mutable.Queue[(Option[Double], Option[Double])]]
           val valueType2 = createTypeInformation[mutable.Queue[MomentsEstimator.Moments]]
 
-          val s = valueType1.createSerializer(cfg)
-
-          val coordsDescriptor = new MapStateDescriptor[Int, mutable.Queue[(Option[Double], Option[Double])]](
+          val coordsDescriptor = new MapStateDescriptor[Long, mutable.Queue[(Option[Double], Option[Double])]](
             "coords",
             keyType.createSerializer(cfg),
             valueType1.createSerializer(cfg)
           )
-          val momentsDescriptor = new MapStateDescriptor[Int, mutable.Queue[MomentsEstimator.Moments]](
+          val momentsDescriptor = new MapStateDescriptor[Long, mutable.Queue[MomentsEstimator.Moments]](
             "moments",
             keyType.createSerializer(cfg),
             valueType2.createSerializer(cfg)
@@ -120,10 +119,10 @@ object MomentsOperation {
           out.collect(result)
         }
 
-        override def flatMap1(value: (CoilMeasurement, Int), out: Collector[MomentsResult]): Unit = {
+        override def flatMap1(value: (CoilMeasurement, Long), out: Collector[MomentsResult]): Unit = {
           val cid = value._1.coilId
           val sid = value._1.slice.head
-          val pid = cid * featuresCount + sid
+          val pid = cid.toLong * featuresCount + sid.toLong
           val coords = value._1 match {
             case s1d: SensorMeasurement1D => (Some(s1d.x), None)
             case s2d: SensorMeasurement2D => (Some(s2d.x), Some(s2d.y))
@@ -150,8 +149,8 @@ object MomentsOperation {
 
         }
 
-        override def flatMap2(in: (Int, MomentsEstimator.Moments), out: Collector[MomentsResult]): Unit = {
-          val (pid: Int, metrics: MomentsEstimator.Moments) = in
+        override def flatMap2(in: (Long, MomentsEstimator.Moments), out: Collector[MomentsResult]): Unit = {
+          val (pid: Long, metrics: MomentsEstimator.Moments) = in
           val cid = pid / featuresCount
           val sid = pid % featuresCount
           val coordsQueue = coordsMap.get(pid)
@@ -168,7 +167,7 @@ object MomentsOperation {
           } else {
             val (ox, oy) = coordsQueue.dequeue
             if (!metrics.variance(0).isNaN) {
-              joinAndOutput(metrics, cid, sid, ox, oy, out)
+              joinAndOutput(metrics, cid.toInt, sid.toInt, ox, oy, out)
             }
           }
 
