@@ -39,7 +39,7 @@ You find a complete list of JOB_PARAMS in [Flink documentation](https://ci.apach
 
 1. **state-backend**	Flink State Backend [memory|rocksdb]
 2. **state-backend-mbsize**	Flink Memory State Backend size in MB (default: 20)
-3. **flink-checkpoints-dir** An valid directory in which Flink will stores Rocksdb checkpoints, e.g., hdfs://namenode:9000/flink-checkpoints/
+3. **flink-checkpoints-dir** A valid directory in which Flink will store Rocksdb checkpoints, e.g., hdfs://namenode:9000/flink-checkpoints/
 
 ### How to run it within your IDE
 
