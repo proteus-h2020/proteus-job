@@ -85,7 +85,7 @@ object MomentsOperation {
         private var coordsMap: MapState[Long, mutable.Queue[(Option[Double], Option[Double])]] = _
 
         @transient
-        private var earlyMoments: MapState[Long, mutable.Queue[MomentsEstimator.Moments]] = _
+        private var orphanMoments: MapState[Long, mutable.Queue[MomentsEstimator.Moments]] = _
 
         override def open(parameters: Configuration): Unit = {
           super.open(parameters)
@@ -106,7 +106,7 @@ object MomentsOperation {
             valueType2.createSerializer(cfg)
           )
           coordsMap = getRuntimeContext.getMapState(coordsDescriptor)
-          earlyMoments = getRuntimeContext.getMapState(momentsDescriptor)
+          orphanMoments = getRuntimeContext.getMapState(momentsDescriptor)
         }
 
         private def joinAndOutput(metrics: MomentsEstimator.Moments, cid: Int, sid: Int,
@@ -127,23 +127,26 @@ object MomentsOperation {
             case s1d: SensorMeasurement1D => (Some(s1d.x), None)
             case s2d: SensorMeasurement2D => (Some(s2d.x), Some(s2d.y))
           }
-          if (earlyMoments.contains(pid)) {
-            val momentsQueue = earlyMoments.get(pid)
+          if (orphanMoments.contains(pid)) {
+            val momentsQueue = orphanMoments.get(pid)
             if (momentsQueue.nonEmpty) {
               val m = momentsQueue.dequeue
               if (!m.variance(0).isNaN) {
                 joinAndOutput(m, cid, sid, coords._1, coords._2, out)
               }
+              // needed in case of rocksdb backend
+              // todo introduce better queue data type
+              orphanMoments.put(pid, momentsQueue)
             }
           } else {
             val coordsQueue = if (coordsMap.contains(pid)) {
               coordsMap.get(pid)
             } else {
-              val q = mutable.Queue[(Option[Double], Option[Double])]()
-              coordsMap.put(pid, q)
-              q
+              mutable.Queue[(Option[Double], Option[Double])]()
             }
             coordsQueue += coords
+            // needed in case of rocksdb backend
+            // todo introduce better queue data type
             coordsMap.put(pid, coordsQueue)
           }
 
@@ -155,20 +158,23 @@ object MomentsOperation {
           val sid = pid % featuresCount
           val coordsQueue = coordsMap.get(pid)
           if (coordsQueue == null || coordsQueue.isEmpty) {
-            val momentsQueue = if (earlyMoments.contains(pid)) {
-              earlyMoments.get(pid)
+            val momentsQueue = if (orphanMoments.contains(pid)) {
+              orphanMoments.get(pid)
             } else {
-              val q = mutable.Queue[MomentsEstimator.Moments]()
-              earlyMoments.put(pid, q)
-              q
+              mutable.Queue[MomentsEstimator.Moments]()
             }
             momentsQueue += metrics
-            earlyMoments.put(pid, momentsQueue)
+            // needed in case of rocksdb backend
+            // todo introduce better queue data type
+            orphanMoments.put(pid, momentsQueue)
           } else {
             val (ox, oy) = coordsQueue.dequeue
             if (!metrics.variance(0).isNaN) {
               joinAndOutput(metrics, cid.toInt, sid.toInt, ox, oy, out)
             }
+            // needed in case of rocksdb backend
+            // todo introduce better queue data type
+            coordsMap.put(pid, coordsQueue)
           }
 
         }
