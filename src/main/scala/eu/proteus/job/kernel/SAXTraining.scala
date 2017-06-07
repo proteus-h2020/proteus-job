@@ -16,6 +16,9 @@
 
   package eu.proteus.job.kernel
 
+  import java.util.function.Consumer
+  import java.util.{ArrayList => JArrayList}
+
   import eu.proteus.solma.sax.SAX
   import grizzled.slf4j.Logger
   import org.apache.flink.api.java.utils.ParameterTool
@@ -38,12 +41,13 @@
      * Set of variables that will be used for the training.
      */
     val Variables : Array[String] = Array(
-      "C0001", "C0002", "C0003", "C0004", "C0005",
-      "C0006", "C0007", "C0008", "C0009", "C0010",
-      "C0012", "C0013", "C0014", "C0015", "C0016",
-      "C0017", "C0018", "C0019", "C0020", "C0021",
-      "C0022", "C0023", "C0024", "C0025", "C0026",
-      "C0027", "C0034", "C0044")
+      // "C0001", "C0002", "C0003", "C0004", "C0005",
+      // "C0006", "C0007", "C0008", "C0009", "C0010",
+      // "C0012", "C0013", "C0014", "C0015", "C0016",
+      // "C0017", "C0018", "C0019", "C0020", "C0021",
+      "C0022", "C0023", "C0024", "C0025", "C0026"
+      // "C0027", "C0034", "C0044"
+      )
 
     /**
      * Print the usage of this program.
@@ -101,18 +105,30 @@
       val input = env.readTextFile(timeSeriesPath)
 
       // Transform the input into a dataset of tuples containing (variable id, value)
-      val values : DataSet[(String, Double)] = input.map((line: String) => {
-        val splits = line.split(",")
-        (splits(splits.length - 2), splits(splits.length - 1).toDouble)
-      })
+      val values : DataSet[(String, Double)] = input
+        .filter(_ != "coil,x,y,varname,value")
+        .map((line: String) => {
+          val splits = line.split(",")
+          (splits(splits.length - 2), splits(splits.length - 1).toDouble)
+        })
+
+      val result = new JArrayList[String]()
 
       SAXTraining.Variables.foreach((variable : String) => {
         Log.info(s"Training with ${variable}")
-        val toTrain : DataSet[Double] = values.filter(_._1 != variable).map(_._2)
+        val toTrain : DataSet[Double] = values.filter(_._1 == variable).map(_._2)
         val sax = new SAX()
         sax.fit(toTrain)
         val model = sax.getFittedParameters()
         Log.info(s"Fit for ${variable}: ${model}")
+        result.add(s"${variable};${model}")
+      })
+
+      Log.info("Fitting results")
+      result.forEach(new Consumer[String] {
+        override def accept(t: String) = {
+          Log.info(t)
+        }
       })
 
     }
