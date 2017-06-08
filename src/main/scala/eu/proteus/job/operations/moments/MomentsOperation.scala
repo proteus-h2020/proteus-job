@@ -79,116 +79,113 @@ object MomentsOperation {
 
     kstream
       .connect(moments.keyBy(x => x._1))
-      .flatMap(new RichCoFlatMapFunction[(CoilMeasurement, Long), (Long, MomentsEstimator.Moments), MomentsResult]() {
-
-        @transient
-        private var coordsMap: MapState[Long, mutable.Queue[(Option[Double], Option[Double])]] = _
-
-        @transient
-        private var orphanMoments: MapState[Long, mutable.Queue[MomentsEstimator.Moments]] = _
-
-        override def open(parameters: Configuration): Unit = {
-          super.open(parameters)
-
-          val cfg = getRuntimeContext.getExecutionConfig
-          val keyType = createTypeInformation[Long]
-          val valueType1 = createTypeInformation[mutable.Queue[(Option[Double], Option[Double])]]
-          val valueType2 = createTypeInformation[mutable.Queue[MomentsEstimator.Moments]]
-
-          val coordsDescriptor = new MapStateDescriptor[Long, mutable.Queue[(Option[Double], Option[Double])]](
-            "coords",
-            keyType.createSerializer(cfg),
-            valueType1.createSerializer(cfg)
-          )
-          val momentsDescriptor = new MapStateDescriptor[Long, mutable.Queue[MomentsEstimator.Moments]](
-            "moments",
-            keyType.createSerializer(cfg),
-            valueType2.createSerializer(cfg)
-          )
-          coordsMap = getRuntimeContext.getMapState(coordsDescriptor)
-          orphanMoments = getRuntimeContext.getMapState(momentsDescriptor)
-        }
-
-        private def joinAndOutput(metrics: MomentsEstimator.Moments, cid: Int, sid: Int,
-            ox: Option[Double], oy: Option[Double], out: Collector[MomentsResult]
-        ): Unit = {
-          val result = oy match {
-            case Some(y) => MomentsResult2D(cid, sid, ox.get, y, metrics.mean(0), metrics.variance(0), metrics.counter(0))
-            case None => MomentsResult1D(cid, sid, ox.get, metrics.mean(0), metrics.variance(0), metrics.counter(0))
-          }
-          out.collect(result)
-        }
-
-        override def flatMap1(value: (CoilMeasurement, Long), out: Collector[MomentsResult]): Unit = {
-          val cid = value._1.coilId
-          val sid = value._1.slice.head
-          val pid = cid.toLong * featuresCount + sid.toLong
-          val coords = value._1 match {
-            case s1d: SensorMeasurement1D => (Some(s1d.x), None)
-            case s2d: SensorMeasurement2D => (Some(s2d.x), Some(s2d.y))
-          }
-          if (orphanMoments.contains(pid)) {
-            val momentsQueue = orphanMoments.get(pid)
-            if (momentsQueue.nonEmpty) {
-              val m = momentsQueue.dequeue
-              if (!m.variance(0).isNaN) {
-                joinAndOutput(m, cid, sid, coords._1, coords._2, out)
-              }
-              // needed in case of rocksdb backend
-              // todo introduce better queue data type
-              orphanMoments.put(pid, momentsQueue)
-            }
-          } else {
-            val coordsQueue = if (coordsMap.contains(pid)) {
-              coordsMap.get(pid)
-            } else {
-              mutable.Queue[(Option[Double], Option[Double])]()
-            }
-            coordsQueue += coords
-            // needed in case of rocksdb backend
-            // todo introduce better queue data type
-            coordsMap.put(pid, coordsQueue)
-          }
-
-        }
-
-        override def flatMap2(in: (Long, MomentsEstimator.Moments), out: Collector[MomentsResult]): Unit = {
-          val (pid: Long, metrics: MomentsEstimator.Moments) = in
-          val cid = pid / featuresCount
-          val sid = pid % featuresCount
-          val coordsQueue = coordsMap.get(pid)
-          if (coordsQueue == null || coordsQueue.isEmpty) {
-            val momentsQueue = if (orphanMoments.contains(pid)) {
-              orphanMoments.get(pid)
-            } else {
-              mutable.Queue[MomentsEstimator.Moments]()
-            }
-            momentsQueue += metrics
-            // needed in case of rocksdb backend
-            // todo introduce better queue data type
-            orphanMoments.put(pid, momentsQueue)
-          } else {
-            val (ox, oy) = coordsQueue.dequeue
-            if (!metrics.variance(0).isNaN) {
-              joinAndOutput(metrics, cid.toInt, sid.toInt, ox, oy, out)
-            }
-            // needed in case of rocksdb backend
-            // todo introduce better queue data type
-            coordsMap.put(pid, coordsQueue)
-          }
-
-        }
-
-    })
+      .flatMap(new CoilsMomentsJoin(featuresCount))
     .uid("coil-xy-join")
-//    .map(_.toJson)
-//     .map(result => {
-//       val ret = result.toJson
- //      if (LOG.isDebugEnabled) {
- //        LOG.debug("Sinking to kafka: " + ret)
-//       }
- //      ret
-   //  })
+  }
+
+  class CoilsMomentsJoin(featuresCount: Long)
+    extends RichCoFlatMapFunction[(CoilMeasurement, Long), (Long, MomentsEstimator.Moments), MomentsResult]() {
+
+    @transient
+    private var coordsMap: MapState[Long, mutable.Queue[(Option[Double], Option[Double])]] = _
+
+    @transient
+    private var orphanMoments: MapState[Long, mutable.Queue[MomentsEstimator.Moments]] = _
+
+    override def open(parameters: Configuration): Unit = {
+      super.open(parameters)
+
+      val cfg = getRuntimeContext.getExecutionConfig
+      val keyType = createTypeInformation[Long]
+      val valueType1 = createTypeInformation[mutable.Queue[(Option[Double], Option[Double])]]
+      val valueType2 = createTypeInformation[mutable.Queue[MomentsEstimator.Moments]]
+
+      val coordsDescriptor = new MapStateDescriptor[Long, mutable.Queue[(Option[Double], Option[Double])]](
+        "coords",
+        keyType.createSerializer(cfg),
+        valueType1.createSerializer(cfg)
+      )
+      val momentsDescriptor = new MapStateDescriptor[Long, mutable.Queue[MomentsEstimator.Moments]](
+        "moments",
+        keyType.createSerializer(cfg),
+        valueType2.createSerializer(cfg)
+      )
+      coordsMap = getRuntimeContext.getMapState(coordsDescriptor)
+      orphanMoments = getRuntimeContext.getMapState(momentsDescriptor)
+    }
+
+    private def joinAndOutput(metrics: MomentsEstimator.Moments, cid: Int, sid: Int,
+        ox: Option[Double], oy: Option[Double], out: Collector[MomentsResult]
+    ): Unit = {
+      val result = oy match {
+        case Some(y) => MomentsResult2D(cid, sid, ox.get, y,
+          metrics.mean(0), metrics.variance(0), metrics.counter(0))
+        case None => MomentsResult1D(cid, sid, ox.get,
+          metrics.mean(0), metrics.variance(0), metrics.counter(0))
+      }
+      out.collect(result)
+    }
+
+    override def flatMap1(value: (CoilMeasurement, Long), out: Collector[MomentsResult]): Unit = {
+      val cid = value._1.coilId
+      val sid = value._1.slice.head
+      val pid = cid.toLong * featuresCount + sid.toLong
+      val coords = value._1 match {
+        case s1d: SensorMeasurement1D => (Some(s1d.x), None)
+        case s2d: SensorMeasurement2D => (Some(s2d.x), Some(s2d.y))
+      }
+      if (orphanMoments.contains(pid)) {
+        val momentsQueue = orphanMoments.get(pid)
+        if (momentsQueue.nonEmpty) {
+          val m = momentsQueue.dequeue
+          if (!m.variance(0).isNaN) {
+            joinAndOutput(m, cid, sid, coords._1, coords._2, out)
+          }
+          // needed in case of rocksdb backend
+          // todo introduce better queue data type
+          orphanMoments.put(pid, momentsQueue)
+        }
+      } else {
+        val coordsQueue = if (coordsMap.contains(pid)) {
+          coordsMap.get(pid)
+        } else {
+          mutable.Queue[(Option[Double], Option[Double])]()
+        }
+        coordsQueue += coords
+        // needed in case of rocksdb backend
+        // todo introduce better queue data type
+        coordsMap.put(pid, coordsQueue)
+      }
+
+    }
+
+    override def flatMap2(in: (Long, MomentsEstimator.Moments), out: Collector[MomentsResult]): Unit = {
+      val (pid: Long, metrics: MomentsEstimator.Moments) = in
+      val cid = pid / featuresCount
+      val sid = pid % featuresCount
+      val coordsQueue = coordsMap.get(pid)
+      if (coordsQueue == null || coordsQueue.isEmpty) {
+        val momentsQueue = if (orphanMoments.contains(pid)) {
+          orphanMoments.get(pid)
+        } else {
+          mutable.Queue[MomentsEstimator.Moments]()
+        }
+        momentsQueue += metrics
+        // needed in case of rocksdb backend
+        // todo introduce better queue data type
+        orphanMoments.put(pid, momentsQueue)
+      } else {
+        val (ox, oy) = coordsQueue.dequeue
+        if (!metrics.variance(0).isNaN) {
+          joinAndOutput(metrics, cid.toInt, sid.toInt, ox, oy, out)
+        }
+        // needed in case of rocksdb backend
+        // todo introduce better queue data type
+        coordsMap.put(pid, coordsQueue)
+      }
+
+    }
+
   }
 
 }
