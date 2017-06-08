@@ -51,20 +51,7 @@ class KafkaIntegrationITSuite
 
   import KafkaIntegrationITSuite._
 
-  @Test
-  def runSimpleIntegrationTest(): Unit = {
-
-    val topic = "kafkaProducerConsumerTopic_" + UUID.randomUUID.toString
-
-    val parallelism = 1
-    val elementsPerPartition = 100
-    val totalElements = parallelism * elementsPerPartition
-
-    JobManagerCommunicationUtils.waitUntilNoJobIsRunning(flink.getLeaderGateway(timeout))
-
-    kafkaServer.createTestTopic(topic, parallelism, 1)
-
-    val env = StreamExecutionEnvironment.getExecutionEnvironment
+  def configureEnv(env: StreamExecutionEnvironment, parallelism: Int) = {
     env.setParallelism(parallelism)
     env.enableCheckpointing(500)
     env.setRestartStrategy(RestartStrategies.noRestart) // fail immediately
@@ -88,6 +75,24 @@ class KafkaIntegrationITSuite
     cfg.addDefaultKryoSerializer(classOf[MomentsResult], classOf[MomentsResultKryoSerializer])
     cfg.addDefaultKryoSerializer(classOf[MomentsResult1D], classOf[MomentsResultKryoSerializer])
     cfg.addDefaultKryoSerializer(classOf[MomentsResult2D], classOf[MomentsResultKryoSerializer])
+  }
+
+  @Test
+  def runSimpleIntegrationTest(): Unit = {
+
+    val topic = "kafkaProducerConsumerTopic_" + UUID.randomUUID.toString
+
+    val parallelism = 1
+    val elementsPerPartition = 100
+    val totalElements = parallelism * elementsPerPartition
+
+    JobManagerCommunicationUtils.waitUntilNoJobIsRunning(flink.getLeaderGateway(timeout))
+
+    kafkaServer.createTestTopic(topic, parallelism, 1)
+
+    val env = StreamExecutionEnvironment.getExecutionEnvironment
+    val cfg = env.getConfig
+    configureEnv(env, parallelism)
 
     implicit val typeInfo = TypeInformation.of(classOf[CoilMeasurement])
     val schema = new UntaggedObjectSerializationSchema[CoilMeasurement](cfg)
@@ -152,8 +157,9 @@ class KafkaIntegrationITSuite
             depth - 1
           } < 20
         }) {
-            if (cause.isInstanceOf[NotLeaderForPartitionException])
+            if (cause.isInstanceOf[NotLeaderForPartitionException]) {
               throw cause.asInstanceOf[Exception]
+            }
             cause = cause.getCause
         }
         throw e

@@ -744,6 +744,28 @@
 				</executions>
 			</plugin>
 
+			<!-- Scala Code Style, most of the configuration done via plugin management -->
+			<plugin>
+				<groupId>org.scalastyle</groupId>
+				<artifactId>scalastyle-maven-plugin</artifactId>
+				<version>0.8.0</version>
+				<configuration>
+					<configLocation>${project.basedir}/tools/maven/checkstyle.xml</configLocation>
+					<failOnViolation>true</failOnViolation>
+					<sourceDirectory>${project.basedir}/src/main/scala</sourceDirectory>
+					<testSourceDirectory>${project.basedir}/src/test/scala</testSourceDirectory>
+					<includeTestSourceDirectory>true</includeTestSourceDirectory>
+				</configuration>
+				<executions>
+					<execution>
+						<phase>test-compile</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
 			<plugin>
 				<groupId>org.scalatest</groupId>
 				<artifactId>scalatest-maven-plugin</artifactId>
