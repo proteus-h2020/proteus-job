@@ -94,7 +94,7 @@ class KafkaIntegrationITSuite
     val cfg = env.getConfig
     configureEnv(env, parallelism)
 
-    implicit val typeInfo = TypeInformation.of(classOf[CoilMeasurement])
+    implicit val typeInfo = createTypeInformation[CoilMeasurement]
     val schema = new UntaggedObjectSerializationSchema[CoilMeasurement](cfg)
 
     // ----------- add producer dataflow ----------

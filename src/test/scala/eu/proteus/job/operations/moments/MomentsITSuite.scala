@@ -77,7 +77,7 @@ class MomentsITSuite
     env.getConfig.registerTypeWithKryoSerializer(classOf[SensorMeasurement2D], classOf[CoilMeasurementKryoSerializer])
     env.getConfig.registerTypeWithKryoSerializer(classOf[SensorMeasurement1D], classOf[CoilMeasurementKryoSerializer])
 
-    implicit val typeInfo = TypeInformation.of(classOf[CoilMeasurement])
+    implicit val typeInfo = createTypeInformation[CoilMeasurement]
     val schema = new UntaggedObjectSerializationSchema[CoilMeasurement](env.getConfig)
 
     // ----------- add producer dataflow ----------

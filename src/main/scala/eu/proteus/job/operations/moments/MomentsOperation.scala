@@ -38,7 +38,7 @@ object MomentsOperation {
       featuresCount: Long
   ): DataStream[MomentsResult] = {
 
-    implicit val typeInfo = TypeInformation.of(classOf[(CoilMeasurement, Long)])
+    implicit val typeInfo = createTypeInformation[(CoilMeasurement, Long)]
 
     var kstream: KeyedStream[(CoilMeasurement, Long), Long] = null
 
