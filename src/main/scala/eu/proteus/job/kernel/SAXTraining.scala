@@ -41,12 +41,12 @@
      * Set of variables that will be used for the training.
      */
     val Variables : Array[String] = Array(
-      // "C0001", "C0002", "C0003", "C0004", "C0005",
-      // "C0006", "C0007", "C0008", "C0009", "C0010",
-      // "C0012", "C0013", "C0014", "C0015", "C0016",
-      // "C0017", "C0018", "C0019", "C0020", "C0021",
-      "C0022", "C0023", "C0024", "C0025", "C0026"
-      // "C0027", "C0034", "C0044"
+      "C0001", "C0002", "C0003", "C0004", "C0005",
+      "C0006", "C0007", "C0008", "C0009", "C0010",
+      "C0012", "C0013", "C0014", "C0015", "C0016",
+      "C0017", "C0018", "C0019", "C0020", "C0021",
+      "C0022", "C0023", "C0024", "C0025", "C0026",
+      "C0027", "C0034", "C0044"
       )
 
     /**
@@ -61,6 +61,10 @@
 
     /**
      * Entry point for launching the training job.
+     *
+     * Example of the arguments:
+     * --time-series-path hdfs://localhost:9000/proteus/heterogeneous/final_full.csv
+     *
      * @param args The arguments.
      */
     def main(args: Array[String]): Unit = {

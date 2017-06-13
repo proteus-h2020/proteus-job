@@ -41,6 +41,14 @@ object SAXDictionaryTraining {
   def getSAXParameter(varName: String) : (Double, Double) = {
     varName match {
       case "C0001" => (-6.501700149121621, 712.5282254068459)
+      case "C0002" => (1915.7540755973803, 916.5125696962249)
+      case "C0003" => (1582.1435820954591,1618.1181701398014)
+      case "C0004" => (21629.553882954187,6338.7858564440485)
+      case "C0005" => (21796.036289223506,6224.364571519489)
+      case "C0006" => (21378.396344843568,6229.510579048364)
+      case "C0007" => (93.03450308826994,1738.1863428728964)
+      case "C0008" => (137.00874757756384,3153.27392439534)
+      case "C0034" => (5082.531536086206,11963.636341625708)
       case _ => throw new UnsupportedOperationException("Unrecognized variable")
     }
   }
@@ -150,7 +158,7 @@ class SAXDictionaryTraining {
     Log.info(s"Available classes ${classes.mkString(", ")}")
 
     val saxParams = SAXDictionaryTraining.getSAXParameter(varName)
-    val sax = new SAX().setAlphabetSize(8).setPAAFragmentSize(3).setWordSize(5)
+    val sax = new SAX().setAlphabetSize(5).setPAAFragmentSize(3).setWordSize(5)
     sax.loadParameters(saxParams._1, saxParams._2)
     val dictionary = new SAXDictionary
 
