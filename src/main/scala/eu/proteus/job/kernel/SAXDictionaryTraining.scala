@@ -182,7 +182,8 @@ class SAXDictionaryTraining {
       Log.info(s"SAX transformation on class: ${classId}")
       val saxResult : DataStream[(String, Int)] = sax.transform(toSAXTrainStream)
       // Transform into (value, classId) tuples
-      val saxResultToTrain : DataSet[(String, String)] = this.env.fromCollection(saxResult.collect().toList).map(s => {(s._1, classId)})
+      val saxResultToTrain : DataSet[(String, String)] = this.env
+        .fromCollection(saxResult.collect().toList).map(s => {(s._1, classId)})
       Log.info(s"Fitting dictionary on ${classId}")
       // Fit the class
       dictionary.fit(saxResultToTrain)
