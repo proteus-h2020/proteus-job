@@ -40,6 +40,8 @@ object ProteusJob {
 
   private [kernel] val LOG = Logger(getClass)
   private [kernel] val ONE_MEGABYTE = 1024 * 1024
+  private [kernel] val ONE_MINUTE_IN_MS = 60 * 1000
+
 
   // kafka config
   private [kernel] var kafkaBootstrapServer = "localhost:2181"
@@ -49,6 +51,8 @@ object ProteusJob {
   // flink config
   private [kernel] var flinkCheckpointsDir = ""
   private [kernel] var memoryBackendMBSize = 20
+  private [kernel] var flinkCheckpointsInterval = 10
+
 
   def loadBaseKafkaProperties = {
     val properties = new Properties
@@ -78,9 +82,7 @@ object ProteusJob {
       throw new UnsupportedOperationException
     }
 
-
-    // checkpoint every 20 mins, exactly once guarantee
-//    env.enableCheckpointing(10000, CheckpointingMode.EXACTLY_ONCE)
+    env.enableCheckpointing(flinkCheckpointsInterval * ONE_MINUTE_IN_MS, CheckpointingMode.AT_LEAST_ONCE)
 
     val cfg = env.getConfig
 
@@ -151,6 +153,7 @@ object ProteusJob {
     System.out.println("--bootstrap-server\tKafka Bootstrap Server")
     System.out.println("--state-backend\tFlink State Backend [memory|rocksdb]")
     System.out.println("--state-backend-mbsize\tFlink Memory State Backend size in MB (default: 20)")
+    System.out.println("--flink-checkpoints-interval\tFlink Checkpoints Interval in mins (default: 10)")
     System.out.println("--flink-checkpoints-dir\tAn HDFS dir that " +
       "stores rocksdb checkpoints, e.g., hdfs://namenode:9000/flink-checkpoints/")
 
@@ -173,6 +176,8 @@ object ProteusJob {
       if (jobStackBackendType == "memory") {
         memoryBackendMBSize = parameters.getInt("state-backend-mbsize", 20)
       }
+
+      flinkCheckpointsInterval = parameters.getInt("flink-checkpoints-interval", 10)
 
     } catch {
       case t: Throwable =>
