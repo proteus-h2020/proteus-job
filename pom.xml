@@ -35,7 +35,7 @@
 		<scala.macros.version>2.0.1</scala.macros.version>
 		<log4j.configuration>log4j-test.properties</log4j.configuration>
 		<flink.version>1.4-SNAPSHOT</flink.version>
-		<scala.version>${scala.binary.version}.4</scala.version>
+		<scala.version>2.10.6</scala.version>
 		<scala.binary.version>2.10</scala.binary.version>
 		<metrics.version>3.1.0</metrics.version>
 		<junit.version>4.12</junit.version>
@@ -740,6 +740,28 @@
 								<source>src/test/scala</source>
 							</sources>
 						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Scala Code Style, most of the configuration done via plugin management -->
+			<plugin>
+				<groupId>org.scalastyle</groupId>
+				<artifactId>scalastyle-maven-plugin</artifactId>
+				<version>0.8.0</version>
+				<configuration>
+					<configLocation>${project.basedir}/tools/maven/checkstyle.xml</configLocation>
+					<failOnViolation>true</failOnViolation>
+					<sourceDirectory>${project.basedir}/src/main/scala</sourceDirectory>
+					<testSourceDirectory>${project.basedir}/src/test/scala</testSourceDirectory>
+					<includeTestSourceDirectory>true</includeTestSourceDirectory>
+				</configuration>
+				<executions>
+					<execution>
+						<phase>test-compile</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
 					</execution>
 				</executions>
 			</plugin>

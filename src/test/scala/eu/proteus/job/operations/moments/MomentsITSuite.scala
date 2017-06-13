@@ -77,24 +77,12 @@ class MomentsITSuite
     env.getConfig.registerTypeWithKryoSerializer(classOf[SensorMeasurement2D], classOf[CoilMeasurementKryoSerializer])
     env.getConfig.registerTypeWithKryoSerializer(classOf[SensorMeasurement1D], classOf[CoilMeasurementKryoSerializer])
 
-    implicit val typeInfo = TypeInformation.of(classOf[CoilMeasurement])
+    implicit val typeInfo = createTypeInformation[CoilMeasurement]
     val schema = new UntaggedObjectSerializationSchema[CoilMeasurement](env.getConfig)
 
     // ----------- add producer dataflow ----------
-
-    val s = Seq(
-        SensorMeasurement1D(0, 12.0, 0 to 0, FlinkDenseVector(1.0)),
-        SensorMeasurement2D(1, 13.0, 1.0, 1 to 1, FlinkDenseVector(1.2)),
-        SensorMeasurement1D(4, 14.0, 0 to 0, FlinkDenseVector(1.5)),
-        SensorMeasurement2D(1, 17.0, 1.6, 1 to 1, FlinkDenseVector(1.1)),
-        SensorMeasurement1D(0, 18.0, 0 to 0, FlinkDenseVector(1.0)),
-        SensorMeasurement2D(2, 19.0, 2.4, 3 to 3, FlinkDenseVector(1.2)),
-        SensorMeasurement1D(2, 20.0, 3 to 3, FlinkDenseVector(1.0)),
-        SensorMeasurement1D(4, 21.0, 0 to 0, FlinkDenseVector(1.4)),
-        SensorMeasurement1D(2, 22.0, 3 to 3, FlinkDenseVector(1.0))
-    )
     val stream = env.addSource((ctx: SourceContext[CoilMeasurement]) => {
-      for (m <- s) {
+      for (m <- data) {
         ctx.collect(m)
       }
     })
@@ -148,9 +136,10 @@ class MomentsITSuite
               depth - 1
             } < 20
           }) {
-            if (cause.isInstanceOf[NotLeaderForPartitionException])
-              throw cause.asInstanceOf[Exception]
-            cause = cause.getCause
+          if (cause.isInstanceOf[NotLeaderForPartitionException]) {
+            throw cause.asInstanceOf[Exception]
+          }
+          cause = cause.getCause
         }
         throw e
     }
@@ -163,6 +152,19 @@ class MomentsITSuite
 }
 
 object MomentsITSuite {
+
+
+  val data = Seq(
+    SensorMeasurement1D(0, 12.0, 0 to 0, FlinkDenseVector(1.0)),
+    SensorMeasurement2D(1, 13.0, 1.0, 1 to 1, FlinkDenseVector(1.2)),
+    SensorMeasurement1D(4, 14.0, 0 to 0, FlinkDenseVector(1.5)),
+    SensorMeasurement2D(1, 17.0, 1.6, 1 to 1, FlinkDenseVector(1.1)),
+    SensorMeasurement1D(0, 18.0, 0 to 0, FlinkDenseVector(1.0)),
+    SensorMeasurement2D(2, 19.0, 2.4, 3 to 3, FlinkDenseVector(1.2)),
+    SensorMeasurement1D(2, 20.0, 3 to 3, FlinkDenseVector(1.0)),
+    SensorMeasurement1D(4, 21.0, 0 to 0, FlinkDenseVector(1.4)),
+    SensorMeasurement1D(2, 22.0, 3 to 3, FlinkDenseVector(1.0))
+  )
 
   private def extractField(field: String): Field = {
     val f = classOf[KafkaTestBase].getDeclaredField(field)
