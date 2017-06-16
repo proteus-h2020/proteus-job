@@ -19,10 +19,12 @@ package eu.proteus.job.kernel
 import java.util.Properties
 
 import eu.proteus.job.operations.data.model.{CoilMeasurement, SensorMeasurement1D, SensorMeasurement2D}
+import eu.proteus.job.operations.data.results.SAXResult
 import eu.proteus.job.operations.data.results.{MomentsResult, MomentsResult1D, MomentsResult2D}
 import eu.proteus.job.operations.data.serializer.schema.UntaggedObjectSerializationSchema
 import eu.proteus.job.operations.data.serializer.{CoilMeasurementKryoSerializer, MomentsResultKryoSerializer}
 import eu.proteus.job.operations.moments.MomentsOperation
+import eu.proteus.job.operations.sax.SAXOperation
 import eu.proteus.solma
 import grizzled.slf4j.Logger
 import org.apache.flink.api.java.utils.ParameterTool
@@ -37,6 +39,16 @@ import scala.collection.mutable
 
 
 object ProteusJob {
+
+  /**
+   * Flag to launch the moments operation. Use this flag for debugging purposes.
+   */
+  private val LinkMoments : Boolean = false
+
+  /**
+   * Flag to launch the SAX operation. Use this flag for debugging purposes.
+   */
+  private val LinkSAX : Boolean = true
 
   private [kernel] val LOG = Logger(getClass)
   private [kernel] val ONE_MEGABYTE = 1024 * 1024
@@ -108,7 +120,11 @@ object ProteusJob {
   }
 
 
-  def startProteusJob(parameters: ParameterTool) = {
+  /**
+   * Start the PROTEUS Job in Flink. The job contains several operations including moments and SAX.
+   * @param parameters The parameters.
+   */
+  def startProteusJob(parameters: ParameterTool) : Unit = {
 
     val env = StreamExecutionEnvironment.getExecutionEnvironment
 
@@ -127,21 +143,33 @@ object ProteusJob {
         loadConsumerKafkaProperties))
 
     // simple moments
+    if(ProteusJob.LinkMoments){
+      LOG.info("Moments output topic: simple-moments")
+      val moments = MomentsOperation.runSimpleMomentsAnalytics(source, 54)
+      implicit val momentsTypeInfo = createTypeInformation[MomentsResult]
+      val momentsSinkSchema = new UntaggedObjectSerializationSchema[MomentsResult](env.getConfig)
 
-    val moments = MomentsOperation.runSimpleMomentsAnalytics(source, 54)
-    implicit val momentsTypeInfo = createTypeInformation[MomentsResult]
-    val momentsSinkSchema = new UntaggedObjectSerializationSchema[MomentsResult](env.getConfig)
-
-    //val momentsSinkSchema = new SimpleStringSchema()
-
-    val producerCfg = FlinkKafkaProducer010.writeToKafkaWithTimestamps(
+      val producerCfg = FlinkKafkaProducer010.writeToKafkaWithTimestamps(
         moments.javaStream,
         "simple-moments",
         momentsSinkSchema,
         loadBaseKafkaProperties)
 
-    producerCfg.setLogFailuresOnly(false)
-    producerCfg.setFlushOnCheckpoint(true)
+      producerCfg.setLogFailuresOnly(false)
+      producerCfg.setFlushOnCheckpoint(true)
+    }
+
+    if(ProteusJob.LinkSAX){
+      val saxJob = new SAXOperation(
+        parameters.get("sax-model-storage-path"),
+        parameters.get("sax-variable")
+      )
+      //val saxSinkSchema = new UntaggedObjectSerializationSchema[SAXResult](env.getConfig)
+      val saxSinkSchema = new SimpleStringSchema()
+      saxJob.runSAX(source)
+    }
+
+
 
     // execute the job
     env.execute("The Proteus Job")
@@ -156,6 +184,8 @@ object ProteusJob {
     System.out.println("--flink-checkpoints-interval\tFlink Checkpoints Interval in mins (default: 10)")
     System.out.println("--flink-checkpoints-dir\tAn HDFS dir that " +
       "stores rocksdb checkpoints, e.g., hdfs://namenode:9000/flink-checkpoints/")
+    System.out.println("--sax-model-storage-path\tThe path where the trained dictionary will be stored")
+    System.out.println("--sax-variable\t")
 
   }
 

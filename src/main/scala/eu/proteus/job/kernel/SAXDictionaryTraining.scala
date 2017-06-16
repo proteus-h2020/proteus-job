@@ -16,7 +16,6 @@
 
 package eu.proteus.job.kernel
 
-import eu.proteus.job.kernel.SAXTraining.getClass
 import eu.proteus.solma.sax.SAX
 import eu.proteus.solma.sax.SAXDictionary
 import grizzled.slf4j.Logger
@@ -64,6 +63,7 @@ object SAXDictionaryTraining {
     System.out.println("--training-coils\tThe number of training coils to be used")
     System.out.println("--flatness-classes-path\tThe path of the file associating classes")
     System.out.println("--time-series-path\tThe RAW time series file")
+    System.out.println("--model-storage-path\tThe path where the trained dictionary will be stored")
   }
 
   /**
@@ -77,6 +77,7 @@ object SAXDictionaryTraining {
     var trainingCoils : Option[Int] = None
     var flatnessClassesPath : Option[String] = None
     var timeSeriesFilePath : Option[String] = None
+    var modelStoragePath : Option[String] = None
 
     try {
       parameters = Some(ParameterTool.fromArgs(args))
@@ -84,6 +85,7 @@ object SAXDictionaryTraining {
       trainingCoils = Some(parameters.get.getRequired("training-coils").toInt)
       flatnessClassesPath = Some(parameters.get.getRequired("flatness-classes-path"))
       timeSeriesFilePath = Some(parameters.get.getRequired("time-series-path"))
+      modelStoragePath = Some(parameters.get.getRequired("model-storage-path"))
     } catch {
       case t: Throwable =>
         Log.error("Error parsing the command line!")
@@ -97,7 +99,8 @@ object SAXDictionaryTraining {
         varName.get,
         trainingCoils.get,
         flatnessClassesPath.get,
-        timeSeriesFilePath.get)
+        timeSeriesFilePath.get,
+        modelStoragePath.get)
     } catch {
       case t: Throwable =>
         Log.error("Failed to run the Proteus SAX Training Job!")
@@ -119,22 +122,42 @@ class SAXDictionaryTraining {
 
   import SAXDictionaryTraining.Log
 
+  /**
+   * Execution environment.
+   */
   val env = ExecutionEnvironment.getExecutionEnvironment
 
+  /**
+   * Streaming environment.
+   */
   val streamingEnv = StreamExecutionEnvironment.getExecutionEnvironment
 
   def registerTypes() : Unit = {
     val cfg = this.env.getConfig
     cfg.registerKryoType(classOf[TimeSeriesEvent])
     cfg.registerKryoType(classOf[FlatnessClass])
-
   }
 
+  /**
+   * Launch the training process. The timeseries will be processed on a class by class bases
+   * and the final dictionary will be stored for future usage.
+   *
+   * @param varName The name of the target variable.
+   * @param trainingCoils The number of coils used for training.
+   * @param flatnessClassesPath The file path of the flatness classes.
+   * @param timeSeriesFilePath The file path of the raw timeseries.
+   * @param modelStoragePath The path where the trained models will be stored.
+   */
   def launchTraining(
     varName: String,
     trainingCoils: Int,
     flatnessClassesPath: String,
-    timeSeriesFilePath: String) : Unit = {
+    timeSeriesFilePath: String,
+    modelStoragePath: String) : Unit = {
+
+    this.env.setParallelism(1)
+    this.streamingEnv.setParallelism(1)
+
 
     Log.info(s"Loading class information from: ${flatnessClassesPath}")
     // Determine the number of classes.
@@ -190,7 +213,7 @@ class SAXDictionaryTraining {
 
     })
     Log.info("Storing model")
-    dictionary.storeModel("/tmp/", varName)
+    dictionary.storeModel(modelStoragePath, varName)
 
   }
 
