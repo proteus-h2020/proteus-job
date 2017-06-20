@@ -21,6 +21,7 @@ import java.util.Properties
 import eu.proteus.job.operations.data.model.{CoilMeasurement, SensorMeasurement1D, SensorMeasurement2D}
 import eu.proteus.job.operations.data.results.SAXResult
 import eu.proteus.job.operations.data.results.{MomentsResult, MomentsResult1D, MomentsResult2D}
+import eu.proteus.job.operations.data.serializer.SAXResultKryoSerializer
 import eu.proteus.job.operations.data.serializer.schema.UntaggedObjectSerializationSchema
 import eu.proteus.job.operations.data.serializer.{CoilMeasurementKryoSerializer, MomentsResultKryoSerializer}
 import eu.proteus.job.operations.moments.MomentsOperation
@@ -106,6 +107,7 @@ object ProteusJob {
     cfg.registerKryoType(classOf[MomentsResult1D])
     cfg.registerKryoType(classOf[MomentsResult2D])
     cfg.registerKryoType(classOf[solma.moments.MomentsEstimator.Moments])
+    cfg.registerKryoType(classOf[SAXResult])
 
     // register serializers
     env.addDefaultKryoSerializer(classOf[CoilMeasurement], classOf[CoilMeasurementKryoSerializer])
@@ -114,6 +116,7 @@ object ProteusJob {
     env.addDefaultKryoSerializer(classOf[MomentsResult], classOf[MomentsResultKryoSerializer])
     env.addDefaultKryoSerializer(classOf[MomentsResult1D], classOf[MomentsResultKryoSerializer])
     env.addDefaultKryoSerializer(classOf[MomentsResult2D], classOf[MomentsResultKryoSerializer])
+    env.addDefaultKryoSerializer(classOf[SAXResult], classOf[SAXResultKryoSerializer])
 
     env.addDefaultKryoSerializer(classOf[mutable.Queue[_]],
       classOf[com.twitter.chill.TraversableSerializer[_, mutable.Queue[_]]])
@@ -164,12 +167,19 @@ object ProteusJob {
         parameters.get("sax-model-storage-path"),
         parameters.get("sax-variable")
       )
-      //val saxSinkSchema = new UntaggedObjectSerializationSchema[SAXResult](env.getConfig)
-      val saxSinkSchema = new SimpleStringSchema()
-      saxJob.runSAX(source)
+      val saxSinkSchema = new UntaggedObjectSerializationSchema[SAXResult](env.getConfig)
+      val saxJobResult = saxJob.runSAX(source)
+
+      val outputProducer = FlinkKafkaProducer010.writeToKafkaWithTimestamps(
+        saxJobResult.javaStream,
+        "sax-results",
+        saxSinkSchema,
+        loadBaseKafkaProperties)
+      outputProducer.setLogFailuresOnly(false)
+      outputProducer.setFlushOnCheckpoint(true)
+
+      // Console.println("ThePlan:" + env.getExecutionPlan)
     }
-
-
 
     // execute the job
     env.execute("The Proteus Job")

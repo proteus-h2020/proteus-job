@@ -29,4 +29,8 @@ class SAXResult(
     write(this)
   }
 
+  override def toString: String = {
+    s"SAXResult(${this.coilId}, ${this.x1}, ${this.x2}, ${this.classId}, ${this.similarity})"
+  }
+
 }
