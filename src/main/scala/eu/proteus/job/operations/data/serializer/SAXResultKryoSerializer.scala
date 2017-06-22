@@ -1,3 +1,19 @@
+/*
+ * Copyright (C) 2017 The Proteus Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package eu.proteus.job.operations.data.serializer
 
 import com.esotericsoftware.kryo.Kryo
@@ -17,6 +33,7 @@ class SAXResultKryoSerializer
   override def write(kryo: Kryo, output: Output, r: SAXResult): Unit = {
     output.writeInt(MAGIC_NUMBER)
     output.writeInt(r.coilId)
+    output.writeString(r.varName)
     output.writeLong(r.x1)
     output.writeLong(r.x2)
     output.writeString(r.classId)
@@ -28,11 +45,12 @@ class SAXResultKryoSerializer
     assert(magicNumber == MAGIC_NUMBER)
 
     val coilId : Int = input.readInt()
+    val varName : String = input.readString()
     val x1: Long = input.readLong()
     val x2 : Long = input.readLong()
     val classId : String = input.readString()
     val similarity : Double = input.readDouble()
 
-    new SAXResult(coilId, x1, x2, classId, similarity)
+    new SAXResult(coilId, varName, x1, x2, classId, similarity)
   }
 }
