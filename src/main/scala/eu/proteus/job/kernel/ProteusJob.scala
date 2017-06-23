@@ -205,7 +205,7 @@ object ProteusJob {
     System.out.println("--flink-checkpoints-dir\tAn HDFS dir that " +
       "stores rocksdb checkpoints, e.g., hdfs://namenode:9000/flink-checkpoints/")
     System.out.println("--sax-model-storage-path\tThe path where the trained dictionary will be stored")
-    System.out.println("--sax-variable\t")
+    System.out.println("--sax-variable\tThe variable to be analyzed by SAX. Supports lists with comma")
 
   }
 
