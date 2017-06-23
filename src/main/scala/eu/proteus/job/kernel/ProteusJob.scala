@@ -163,7 +163,7 @@ object ProteusJob {
     System.out.println("--state-backend-mbsize\tFlink Memory State Backend size in MB (default: 20)")
     System.out.println("--flink-checkpoints-interval\tFlink Checkpoints Interval in mins (default: 10)")
     System.out.println("--flink-exactly-once\tThis enables Flink Exactly-once" +
-      " processing guarantee (disabled by default")
+      " processing guarantee (disabled by default)")
     System.out.println("--flink-checkpoints-dir\tAn HDFS dir that " +
       "stores rocksdb checkpoints, e.g., hdfs://namenode:9000/flink-checkpoints/")
 
