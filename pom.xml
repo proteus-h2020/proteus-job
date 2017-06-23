@@ -107,7 +107,21 @@
 			<groupId>eu.proteus</groupId>
 			<artifactId>proteus-solma_${scala.binary.version}</artifactId>
 			<version>${solma.version}</version>
-			<scope>compile</scope>
+			<!--<scope>compile</scope>-->
+			<exclusions>
+				<exclusion>
+					<groupId>log4j</groupId>
+					<artifactId>*</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>org.slf4j</groupId>
+					<artifactId>*</artifactId>
+				</exclusion>
+				<exclusion>
+					<groupId>ch.qos.logback</groupId>
+					<artifactId>*</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 
 		<dependency>

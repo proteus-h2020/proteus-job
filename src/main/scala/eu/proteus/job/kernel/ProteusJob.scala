@@ -26,12 +26,11 @@ import eu.proteus.job.operations.moments.MomentsOperation
 import eu.proteus.solma
 import grizzled.slf4j.Logger
 import org.apache.flink.api.java.utils.ParameterTool
-import org.apache.flink.contrib.streaming.state.{PredefinedOptions, RocksDBStateBackend}
+import org.apache.flink.contrib.streaming.state.RocksDBStateBackend
 import org.apache.flink.runtime.state.memory.MemoryStateBackend
 import org.apache.flink.streaming.api.{CheckpointingMode, TimeCharacteristic}
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaConsumer010, FlinkKafkaProducer010}
-import org.apache.flink.streaming.util.serialization.SimpleStringSchema
 
 import scala.collection.mutable
 
@@ -52,6 +51,7 @@ object ProteusJob {
   private [kernel] var flinkCheckpointsDir = ""
   private [kernel] var memoryBackendMBSize = 20
   private [kernel] var flinkCheckpointsInterval = 10
+  private [kernel] var enableExaclyOnceGuarantees = false
 
 
   def loadBaseKafkaProperties = {
@@ -82,7 +82,15 @@ object ProteusJob {
       throw new UnsupportedOperationException
     }
 
-    env.enableCheckpointing(flinkCheckpointsInterval * ONE_MINUTE_IN_MS, CheckpointingMode.AT_LEAST_ONCE)
+    val timeout = flinkCheckpointsInterval * ONE_MINUTE_IN_MS
+
+    val checkpointingMode = if (enableExaclyOnceGuarantees) {
+      CheckpointingMode.EXACTLY_ONCE
+    } else {
+      CheckpointingMode.AT_LEAST_ONCE
+    }
+
+    env.enableCheckpointing(timeout, checkpointingMode)
 
     val cfg = env.getConfig
 
@@ -154,6 +162,8 @@ object ProteusJob {
     System.out.println("--state-backend\tFlink State Backend [memory|rocksdb]")
     System.out.println("--state-backend-mbsize\tFlink Memory State Backend size in MB (default: 20)")
     System.out.println("--flink-checkpoints-interval\tFlink Checkpoints Interval in mins (default: 10)")
+    System.out.println("--flink-exactly-once\tThis enables Flink Exactly-once" +
+      " processing guarantee (disabled by default")
     System.out.println("--flink-checkpoints-dir\tAn HDFS dir that " +
       "stores rocksdb checkpoints, e.g., hdfs://namenode:9000/flink-checkpoints/")
 
@@ -178,6 +188,8 @@ object ProteusJob {
       }
 
       flinkCheckpointsInterval = parameters.getInt("flink-checkpoints-interval", 10)
+
+      enableExaclyOnceGuarantees = parameters.getBoolean("flink-exactly-once", false)
 
     } catch {
       case t: Throwable =>
