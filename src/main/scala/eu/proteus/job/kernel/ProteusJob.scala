@@ -46,7 +46,7 @@ object ProteusJob {
   /**
    * Flag to launch the moments operation. Use this flag for debugging purposes.
    */
-  private val LinkMoments : Boolean = false
+  private val LinkMoments : Boolean = true
 
   /**
    * Flag to launch the SAX operation. Use this flag for debugging purposes.
