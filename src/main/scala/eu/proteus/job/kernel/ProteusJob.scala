@@ -16,6 +16,8 @@
 
 package eu.proteus.job.kernel
 
+import java.util.{HashMap => JHashMap}
+import java.util.{Map => JMap}
 import java.util.Properties
 
 import eu.proteus.job.operations.data.model.{CoilMeasurement, SensorMeasurement1D, SensorMeasurement2D}
@@ -51,6 +53,8 @@ object ProteusJob {
    */
   private val LinkSAX : Boolean = true
 
+  private val SAXJobs : JMap[String, SAXOperation] = new JHashMap[String, SAXOperation]()
+
   private [kernel] val LOG = Logger(getClass)
   private [kernel] val ONE_MEGABYTE = 1024 * 1024
   private [kernel] val ONE_MINUTE_IN_MS = 60 * 1000
@@ -58,6 +62,7 @@ object ProteusJob {
 
   // kafka config
   private [kernel] var kafkaBootstrapServer = "localhost:2181"
+  // private [kernel] var realtimeDataKafkaTopic = "proteus-realtime"
   private [kernel] var realtimeDataKafkaTopic = "proteus-realtime"
   private [kernel] var jobStackBackendType = "memory"
 
@@ -163,20 +168,25 @@ object ProteusJob {
     }
 
     if(ProteusJob.LinkSAX){
-      val saxJob = new SAXOperation(
-        parameters.get("sax-model-storage-path"),
-        parameters.get("sax-variable")
-      )
-      val saxSinkSchema = new UntaggedObjectSerializationSchema[SAXResult](env.getConfig)
-      val saxJobResult = saxJob.runSAX(source)
 
-      val outputProducer = FlinkKafkaProducer010.writeToKafkaWithTimestamps(
-        saxJobResult.javaStream,
-        "sax-results",
-        saxSinkSchema,
-        loadBaseKafkaProperties)
-      outputProducer.setLogFailuresOnly(false)
-      outputProducer.setFlushOnCheckpoint(true)
+      val variables = parameters.get("sax-variable").split(",")
+      val saxSinkSchema = new UntaggedObjectSerializationSchema[SAXResult](env.getConfig)
+
+      variables.foreach(varName => {
+        val saxJob = new SAXOperation(
+          parameters.get("sax-model-storage-path"),
+          varName
+        )
+        val saxJobResult = saxJob.runSAX(source)
+        this.SAXJobs.put(varName, saxJob)
+        val outputProducer = FlinkKafkaProducer010.writeToKafkaWithTimestamps(
+          saxJobResult.javaStream,
+          "sax-results",
+          saxSinkSchema,
+          loadBaseKafkaProperties)
+        outputProducer.setLogFailuresOnly(false)
+        outputProducer.setFlushOnCheckpoint(true)
+      })
 
       // Console.println("ThePlan:" + env.getExecutionPlan)
     }

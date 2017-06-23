@@ -24,17 +24,20 @@ import eu.proteus.job.operations.data.results.SAXResult
 import eu.proteus.solma.sax.SAX
 import eu.proteus.solma.sax.SAXDictionary
 import eu.proteus.solma.sax.SAXPrediction
-import org.apache.flink.api.common.functions.JoinFunction
+import org.apache.flink.api.common.state.MapState
+import org.apache.flink.api.common.state.MapStateDescriptor
 import org.apache.flink.api.scala.createTypeInformation
+import org.apache.flink.configuration.Configuration
+import org.apache.flink.streaming.api.functions.co.RichCoFlatMapFunction
 import org.apache.flink.streaming.api.operators.AbstractStreamOperator
 import org.apache.flink.streaming.api.operators.OneInputStreamOperator
 import org.apache.flink.streaming.api.scala.DataStream
 import org.apache.flink.streaming.api.scala.function.WindowFunction
-import org.apache.flink.streaming.api.windowing.assigners.GlobalWindows
-import org.apache.flink.streaming.api.windowing.triggers.CountTrigger
 import org.apache.flink.streaming.api.windowing.windows.GlobalWindow
 import org.apache.flink.streaming.runtime.streamrecord.StreamRecord
 import org.apache.flink.util.Collector
+
+import scala.collection.mutable
 
 /**
  * SAX operation for the Proteus Job. The Job requires a pre-existing model for the SAX and SAX
@@ -64,6 +67,11 @@ class SAXOperation(
     this.paaFragmentSize * this.wordSize * this.numberWords
   }
 
+  /**
+   * Launch the SAX + SAX dictionary operation for a given variable.
+   * @param stream The input stream.
+   * @return A data stream of [[SAXResult]].
+   */
   def runSAX(
     stream: DataStream[CoilMeasurement]
   ) : DataStream[SAXResult] = {
@@ -82,14 +90,10 @@ class SAXOperation(
 
     val filteredStream = stream.filter(_.slice.head == varIndex)
     filteredStream.name("filteredStream")
-    //filteredStream.print()
 
     val xValuesStream = this.processJoinStream(filteredStream)
-    //xValuesStream.print()
     val transformedFilteredStream = filteredStream.transform("transform-to-SAX-input", transformOperator)
     val saxTransformation = sax.transform(transformedFilteredStream)
-
-    //saxTransformation.print()
 
     // Define the SAX dictionary transformation.
     val dictionary = new SAXDictionary
@@ -97,11 +101,7 @@ class SAXOperation(
     dictionary.setNumberWords(this.numberWords)
 
     val dictionaryMatching = dictionary.predict(saxTransformation)
-
-    //dictionaryMatching.print()
     val result = this.joinResult(dictionaryMatching, xValuesStream)
-    result.print()
-
     result
   }
 
@@ -139,7 +139,7 @@ class SAXOperation(
       .countWindow(this.numberOfPointsInPrediction())
       .apply(reduceXFunction)
 
-    keyedStream.name("(MinX, MaxX, CoilId")
+    keyedStream.name("(MinX, MaxX, CoilId)")
     keyedStream
   }
 
@@ -152,21 +152,95 @@ class SAXOperation(
   def joinResult(
     saxResults: DataStream[SAXPrediction],
     minMaxValues: DataStream[(Int, Int, Int)]) : DataStream[SAXResult] = {
-    val varName = this.targetVariable
-    val joinFunction = new JoinFunction[SAXPrediction, (Int, Int, Int), SAXResult] {
-      override def join(in1: SAXPrediction, in2: (Int, Int, Int)): SAXResult = {
-        new SAXResult(in1.key, varName, in2._1, in2._2, in1.classId, in1.similarity)
-      }
-    }
 
-    saxResults
-      .join(minMaxValues)
-      .where(_.key).equalTo(_._3)
-      .window(GlobalWindows.create)
-      .trigger(CountTrigger.of(1)).apply(joinFunction)
+    val processFunction = new LinkOutputsFunction(this.targetVariable)
+
+    saxResults.keyBy(_.key).connect(minMaxValues.keyBy(_._3)).flatMap(processFunction)
 
   }
 }
+
+
+class LinkOutputsFunction(targetVariable: String)
+  extends RichCoFlatMapFunction[SAXPrediction, (Int, Int, Int), SAXResult] {
+
+  @transient
+  private var coordsMap: MapState[Int, mutable.Queue[(Int, Int)]] = _
+
+  @transient
+  private var orphanPredictions: MapState[Int, mutable.Queue[SAXPrediction]] = _
+
+  override def open(parameters: Configuration): Unit = {
+    super.open(parameters)
+
+    val cfg = getRuntimeContext.getExecutionConfig
+    val keyType = createTypeInformation[Int]
+    val valueType1 = createTypeInformation[mutable.Queue[(Int, Int)]]
+    val valueType2 = createTypeInformation[mutable.Queue[SAXPrediction]]
+
+    val coordsDescriptor = new MapStateDescriptor[Int, mutable.Queue[(Int, Int)]](
+      "coords",
+      keyType.createSerializer(cfg),
+      valueType1.createSerializer(cfg)
+    )
+    val predictionsDescriptor = new MapStateDescriptor[Int, mutable.Queue[SAXPrediction]](
+      "sax-predictions",
+      keyType.createSerializer(cfg),
+      valueType2.createSerializer(cfg)
+    )
+    this.coordsMap = getRuntimeContext.getMapState(coordsDescriptor)
+    this.orphanPredictions = getRuntimeContext.getMapState(predictionsDescriptor)
+  }
+
+  /**
+   * Join a prediction with the associated coordinates.
+   * @param prediction The prediction information.
+   * @param coords The coordinates.
+   * @param out The output collector.
+   */
+  private def join(prediction: SAXPrediction, coords: (Int, Int), out: Collector[SAXResult]) : Unit = {
+    out.collect(new SAXResult(
+      prediction.key, this.targetVariable, coords._1, coords._2, prediction.classId, prediction.similarity))
+  }
+
+  override def flatMap2(in2: (Int, Int, Int), collector: Collector[SAXResult]) = {
+    val key = in2._3
+    if(this.orphanPredictions.contains(key) && this.orphanPredictions.get(key).nonEmpty){
+      val prediction = this.orphanPredictions.get(key).dequeue()
+      this.join(prediction, (in2._1, in2._2) , collector)
+    }else{
+      val coordsQueue = if(this.coordsMap.contains(key)) {
+        this.coordsMap.get(key)
+      } else {
+        mutable.Queue[(Int, Int)]()
+      }
+      coordsQueue.enqueue((in2._1, in2._2))
+      this.coordsMap.put(key, coordsQueue)
+    }
+
+  }
+
+  override def flatMap1(
+    in1: SAXPrediction,
+    collector: Collector[SAXResult]): Unit = {
+
+    val key = in1.key
+    if(this.coordsMap.contains(key) && this.coordsMap.get(key).nonEmpty){
+      val coords = this.coordsMap.get(key).dequeue()
+      this.join(in1, coords, collector)
+    }else{
+      val predictionQueue = if(this.orphanPredictions.contains(key)){
+        this.orphanPredictions.get(key)
+      }else{
+        mutable.Queue[SAXPrediction]()
+      }
+      predictionQueue.enqueue(in1)
+      this.orphanPredictions.put(key, predictionQueue)
+    }
+
+  }
+}
+
 
 class SAXInputStreamOperator
   extends AbstractStreamOperator[(Double, Int)]
