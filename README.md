@@ -79,6 +79,9 @@ is launched.
 --flatness-classes-path	The path of the file associating classes
 --time-series-path	The RAW time series file
 --model-storage-path	The path where the trained dictionary will be stored
+--sax-alphabet-size	The alphabet size
+--sax-paa-fragment-size	The PAA fragment size
+--sax-word-size	The SAX word size
 ```
 
 **Example**
@@ -93,4 +96,10 @@ C0002
 file:///<proteus-dataset-path>/PROTEUS_HETEROGENEOUS_FILE.csv
 --model-storage-path
 /<proteus-dataset-path>/dictionaries/
+--sax-alphabet-size
+5
+--sax-paa-fragment-size
+3
+--sax-word-size
+5
 ```

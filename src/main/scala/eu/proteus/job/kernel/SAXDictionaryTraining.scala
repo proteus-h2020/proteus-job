@@ -16,6 +16,8 @@
 
 package eu.proteus.job.kernel
 
+import java.io.File
+
 import eu.proteus.solma.sax.SAX
 import eu.proteus.solma.sax.SAXDictionary
 import grizzled.slf4j.Logger
@@ -64,6 +66,9 @@ object SAXDictionaryTraining {
     System.out.println("--flatness-classes-path\tThe path of the file associating classes")
     System.out.println("--time-series-path\tThe RAW time series file")
     System.out.println("--model-storage-path\tThe path where the trained dictionary will be stored")
+    System.out.println("--sax-alphabet-size\tThe alphabet size")
+    System.out.println("--sax-paa-fragment-size\tThe PAA fragment size")
+    System.out.println("--sax-word-size\tThe SAX word size")
   }
 
   /**
@@ -78,6 +83,9 @@ object SAXDictionaryTraining {
     var flatnessClassesPath : Option[String] = None
     var timeSeriesFilePath : Option[String] = None
     var modelStoragePath : Option[String] = None
+    var alphabetSize : Option[Int] = None
+    var paaFragmentSize : Option[Int] = None
+    var wordSize : Option[Int] = None
 
     try {
       parameters = Some(ParameterTool.fromArgs(args))
@@ -86,6 +94,10 @@ object SAXDictionaryTraining {
       flatnessClassesPath = Some(parameters.get.getRequired("flatness-classes-path"))
       timeSeriesFilePath = Some(parameters.get.getRequired("time-series-path"))
       modelStoragePath = Some(parameters.get.getRequired("model-storage-path"))
+      alphabetSize = Some(parameters.get.getRequired("sax-alphabet-size").toInt)
+      paaFragmentSize = Some(parameters.get.getRequired("sax-paa-fragment-size").toInt)
+      wordSize = Some(parameters.get.getRequired("sax-word-size").toInt)
+
     } catch {
       case t: Throwable =>
         Log.error("Error parsing the command line!")
@@ -100,7 +112,11 @@ object SAXDictionaryTraining {
         trainingCoils.get,
         flatnessClassesPath.get,
         timeSeriesFilePath.get,
-        modelStoragePath.get)
+        modelStoragePath.get,
+        alphabetSize.get,
+        paaFragmentSize.get,
+        wordSize.get
+      )
     } catch {
       case t: Throwable =>
         Log.error("Failed to run the Proteus SAX Training Job!")
@@ -147,13 +163,19 @@ class SAXDictionaryTraining {
    * @param flatnessClassesPath The file path of the flatness classes.
    * @param timeSeriesFilePath The file path of the raw timeseries.
    * @param modelStoragePath The path where the trained models will be stored.
+   * @param alphabetSize The SAX alphabet size.
+   * @param paaFragmentSize The SAX PAA fragment size.
+   * @param wordSize The SAX word size.
    */
   def launchTraining(
     varName: String,
     trainingCoils: Int,
     flatnessClassesPath: String,
     timeSeriesFilePath: String,
-    modelStoragePath: String) : Unit = {
+    modelStoragePath: String,
+    alphabetSize: Int,
+    paaFragmentSize: Int,
+    wordSize: Int) : Unit = {
 
     this.env.setParallelism(1)
     this.streamingEnv.setParallelism(1)
@@ -181,7 +203,7 @@ class SAXDictionaryTraining {
     Log.info(s"Available classes ${classes.mkString(", ")}")
 
     val saxParams = SAXDictionaryTraining.getSAXParameter(varName)
-    val sax = new SAX().setAlphabetSize(5).setPAAFragmentSize(3).setWordSize(5)
+    val sax = new SAX().setAlphabetSize(alphabetSize).setPAAFragmentSize(paaFragmentSize).setWordSize(wordSize)
     sax.loadParameters(saxParams._1, saxParams._2)
     val dictionary = new SAXDictionary
 
@@ -213,7 +235,9 @@ class SAXDictionaryTraining {
 
     })
     Log.info("Storing model")
-    dictionary.storeModel(modelStoragePath, varName)
+    dictionary.storeModel(modelStoragePath + File.separator +
+      s"${trainingCoils}t_${alphabetSize}as_${paaFragmentSize}paa_${wordSize}ws" +
+      File.separator, varName)
 
   }
 

@@ -102,6 +102,7 @@ class SAXOperation(
 
     val dictionaryMatching = dictionary.predict(saxTransformation)
     val result = this.joinResult(dictionaryMatching, xValuesStream)
+    // result.print()
     result
   }
 
