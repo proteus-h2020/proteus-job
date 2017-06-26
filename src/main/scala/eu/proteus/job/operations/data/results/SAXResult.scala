@@ -32,8 +32,8 @@ import net.liftweb.json.Serialization.write
 class SAXResult(
   val coilId: Int,
   var varName: String,
-  val x1: Long,
-  val x2: Long,
+  val x1: Double,
+  val x2: Double,
   val classId: String,
   val similarity: Double
 ) extends Serializable{

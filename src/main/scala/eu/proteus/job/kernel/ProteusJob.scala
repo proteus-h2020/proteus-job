@@ -169,12 +169,12 @@ object ProteusJob {
 
     if(ProteusJob.LinkSAX){
 
-      val variables = parameters.get("sax-variable").split(",")
+      val variables = parameters.getRequired("sax-variable").split(",")
       val saxSinkSchema = new UntaggedObjectSerializationSchema[SAXResult](env.getConfig)
 
       variables.foreach(varName => {
         val saxJob = new SAXOperation(
-          parameters.get("sax-model-storage-path"),
+          parameters.getRequired("sax-model-storage-path"),
           varName
         )
         val saxJobResult = saxJob.runSAX(source)

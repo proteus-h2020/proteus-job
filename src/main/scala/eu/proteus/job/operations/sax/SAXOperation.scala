@@ -102,7 +102,7 @@ class SAXOperation(
 
     val dictionaryMatching = dictionary.predict(saxTransformation)
     val result = this.joinResult(dictionaryMatching, xValuesStream)
-    // result.print()
+    //result.print()
     result
   }
 
@@ -112,15 +112,15 @@ class SAXOperation(
    * @param filteredStream A filtered stream with the value and the coil identifier.
    * @return A DataStream with the starting X, the ending X, and the coil id.
    */
-  def processJoinStream(filteredStream: DataStream[CoilMeasurement]) : DataStream[(Int, Int, Int)] = {
+  def processJoinStream(filteredStream: DataStream[CoilMeasurement]) : DataStream[(Double, Double, Int)] = {
 
-    val reduceXFunction = new WindowFunction[CoilMeasurement, (Int, Int, Int), Int, GlobalWindow] {
+    val reduceXFunction = new WindowFunction[CoilMeasurement, (Double, Double, Int), Int, GlobalWindow] {
       override def apply(
         key: Int,
         window: GlobalWindow,
         input: Iterable[CoilMeasurement],
-        out: Collector[(Int, Int, Int)]): Unit = {
-        val maxMin = input.foldLeft((Int.MaxValue, Int.MinValue)){
+        out: Collector[(Double, Double, Int)]): Unit = {
+        val maxMin = input.foldLeft((Double.MaxValue, Double.MinValue)){
           (acc, cur) => {
 
             val currentX = cur match {
@@ -128,7 +128,7 @@ class SAXOperation(
               case s2d: SensorMeasurement2D => s2d.x
             }
 
-            (Math.min(acc._1, currentX).toInt, Math.max(acc._2, currentX).toInt)
+            (Math.min(acc._1, currentX), Math.max(acc._2, currentX))
           }
         }
         out.collect((maxMin._1, maxMin._2, key))
@@ -152,7 +152,7 @@ class SAXOperation(
    */
   def joinResult(
     saxResults: DataStream[SAXPrediction],
-    minMaxValues: DataStream[(Int, Int, Int)]) : DataStream[SAXResult] = {
+    minMaxValues: DataStream[(Double, Double, Int)]) : DataStream[SAXResult] = {
 
     val processFunction = new LinkOutputsFunction(this.targetVariable)
 
@@ -163,10 +163,10 @@ class SAXOperation(
 
 
 class LinkOutputsFunction(targetVariable: String)
-  extends RichCoFlatMapFunction[SAXPrediction, (Int, Int, Int), SAXResult] {
+  extends RichCoFlatMapFunction[SAXPrediction, (Double, Double, Int), SAXResult] {
 
   @transient
-  private var coordsMap: MapState[Int, mutable.Queue[(Int, Int)]] = _
+  private var coordsMap: MapState[Int, mutable.Queue[(Double, Double)]] = _
 
   @transient
   private var orphanPredictions: MapState[Int, mutable.Queue[SAXPrediction]] = _
@@ -176,10 +176,10 @@ class LinkOutputsFunction(targetVariable: String)
 
     val cfg = getRuntimeContext.getExecutionConfig
     val keyType = createTypeInformation[Int]
-    val valueType1 = createTypeInformation[mutable.Queue[(Int, Int)]]
+    val valueType1 = createTypeInformation[mutable.Queue[(Double, Double)]]
     val valueType2 = createTypeInformation[mutable.Queue[SAXPrediction]]
 
-    val coordsDescriptor = new MapStateDescriptor[Int, mutable.Queue[(Int, Int)]](
+    val coordsDescriptor = new MapStateDescriptor[Int, mutable.Queue[(Double, Double)]](
       "coords",
       keyType.createSerializer(cfg),
       valueType1.createSerializer(cfg)
@@ -199,12 +199,12 @@ class LinkOutputsFunction(targetVariable: String)
    * @param coords The coordinates.
    * @param out The output collector.
    */
-  private def join(prediction: SAXPrediction, coords: (Int, Int), out: Collector[SAXResult]) : Unit = {
+  private def join(prediction: SAXPrediction, coords: (Double, Double), out: Collector[SAXResult]) : Unit = {
     out.collect(new SAXResult(
       prediction.key, this.targetVariable, coords._1, coords._2, prediction.classId, prediction.similarity))
   }
 
-  override def flatMap2(in2: (Int, Int, Int), collector: Collector[SAXResult]) = {
+  override def flatMap2(in2: (Double, Double, Int), collector: Collector[SAXResult]) = {
     val key = in2._3
     if(this.orphanPredictions.contains(key) && this.orphanPredictions.get(key).nonEmpty){
       val prediction = this.orphanPredictions.get(key).dequeue()
@@ -213,7 +213,7 @@ class LinkOutputsFunction(targetVariable: String)
       val coordsQueue = if(this.coordsMap.contains(key)) {
         this.coordsMap.get(key)
       } else {
-        mutable.Queue[(Int, Int)]()
+        mutable.Queue[(Double, Double)]()
       }
       coordsQueue.enqueue((in2._1, in2._2))
       this.coordsMap.put(key, coordsQueue)

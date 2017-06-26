@@ -34,8 +34,8 @@ class SAXResultKryoSerializer
     output.writeInt(MAGIC_NUMBER)
     output.writeInt(r.coilId)
     output.writeString(r.varName)
-    output.writeLong(r.x1)
-    output.writeLong(r.x2)
+    output.writeDouble(r.x1)
+    output.writeDouble(r.x2)
     output.writeString(r.classId)
     output.writeDouble(r.similarity)
   }
@@ -46,8 +46,8 @@ class SAXResultKryoSerializer
 
     val coilId : Int = input.readInt()
     val varName : String = input.readString()
-    val x1: Long = input.readLong()
-    val x2 : Long = input.readLong()
+    val x1: Double = input.readDouble()
+    val x2 : Double = input.readDouble()
     val classId : String = input.readString()
     val similarity : Double = input.readDouble()
 

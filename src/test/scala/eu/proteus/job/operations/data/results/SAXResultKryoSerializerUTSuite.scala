@@ -34,7 +34,7 @@ class SAXResultKryoSerializerUTSuite extends FunSuite with Matchers{
     val serializer = new SAXResultKryoSerializer
     kryo.register(classOf[SAXResult], serializer)
 
-    val r1 = new SAXResult(0, "var1", 1, 2, "classId", 0.0d)
+    val r1 = new SAXResult(0, "var1", 1.0d, 2.0d, "classId", 0.0d)
     val out = new Output(1024)
     val in = new Input(out.getBuffer)
     kryo.writeObject(out, r1)
