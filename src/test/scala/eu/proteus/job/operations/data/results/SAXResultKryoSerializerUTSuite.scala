@@ -34,13 +34,14 @@ class SAXResultKryoSerializerUTSuite extends FunSuite with Matchers{
     val serializer = new SAXResultKryoSerializer
     kryo.register(classOf[SAXResult], serializer)
 
-    val r1 = new SAXResult(0, "var1", 1.0d, 2.0d, "classId", 0.0d)
+    val r1 = new SAXResult(0, "C0001", 1.0d, 2.0d, "classId", 0.0d)
     val out = new Output(1024)
     val in = new Input(out.getBuffer)
     kryo.writeObject(out, r1)
 
     val serialized = kryo.readObject(in, classOf[SAXResult])
     assert(r1.coilId == serialized.coilId, "Coil Id should match")
+    assert("1" == serialized.varName, "Varname should match")
     assert(r1.x1 == serialized.x1, "X1 should match")
     assert(r1.x2 == serialized.x2, "X2 should match")
     assert(r1.classId == serialized.classId, "Class Id should match")

@@ -24,7 +24,18 @@ import eu.proteus.job.operations.data.results.SAXResult
 
 /**
  * Kryo serializer for SAX results.
- * {{{class SAXResult(coilId: Int, x1: Long, x2: Long, classId: String, similarity: Double)}}}
+ * {{{
+ *  class SAXResult(
+ *    coilId: Int,
+ *    varName: String,
+ *    x1: Double,
+ *    x2: Double,
+ *    classId: String,
+ *    similarity: Double)
+ * }}}
+ *
+ * Notice that the variableName is serialized as Integer. The serializer expects a varName
+ * in the form of CXXX where X is a number.
  */
 class SAXResultKryoSerializer
   extends Serializer[SAXResult]
@@ -33,7 +44,7 @@ class SAXResultKryoSerializer
   override def write(kryo: Kryo, output: Output, r: SAXResult): Unit = {
     output.writeInt(MAGIC_NUMBER)
     output.writeInt(r.coilId)
-    output.writeString(r.varName)
+    output.writeInt(r.varName.replace("C", "").toInt)
     output.writeDouble(r.x1)
     output.writeDouble(r.x2)
     output.writeString(r.classId)
@@ -45,7 +56,7 @@ class SAXResultKryoSerializer
     assert(magicNumber == MAGIC_NUMBER)
 
     val coilId : Int = input.readInt()
-    val varName : String = input.readString()
+    val varName : String = input.readInt().toString
     val x1: Double = input.readDouble()
     val x2 : Double = input.readDouble()
     val classId : String = input.readString()

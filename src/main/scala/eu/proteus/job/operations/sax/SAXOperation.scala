@@ -207,8 +207,11 @@ class LinkOutputsFunction(targetVariable: String)
   override def flatMap2(in2: (Double, Double, Int), collector: Collector[SAXResult]) = {
     val key = in2._3
     if(this.orphanPredictions.contains(key) && this.orphanPredictions.get(key).nonEmpty){
-      val prediction = this.orphanPredictions.get(key).dequeue()
+      val queue = this.orphanPredictions.get(key)
+      val prediction = queue.dequeue()
       this.join(prediction, (in2._1, in2._2) , collector)
+      // Required due to RocksDB bug
+      this.orphanPredictions.put(key, queue)
     }else{
       val coordsQueue = if(this.coordsMap.contains(key)) {
         this.coordsMap.get(key)
@@ -227,8 +230,11 @@ class LinkOutputsFunction(targetVariable: String)
 
     val key = in1.key
     if(this.coordsMap.contains(key) && this.coordsMap.get(key).nonEmpty){
-      val coords = this.coordsMap.get(key).dequeue()
+      val queue = this.coordsMap.get(key)
+      val coords = queue.dequeue()
       this.join(in1, coords, collector)
+      // Required due to RocksDB bug
+      this.coordsMap.put(key, queue)
     }else{
       val predictionQueue = if(this.orphanPredictions.contains(key)){
         this.orphanPredictions.get(key)
