@@ -75,8 +75,8 @@ class SAXOperationTest  extends FunSuite with Matchers {
     val numValues = 12
     val op = this.getSAXOperation()
     val inputData = this.getInputData(numValues)
-    val processingResult : DataStream[(Int, Int, Int)] = op.processJoinStream(inputData)
-    val resultIt : Iterator[(Int, Int, Int)] = processingResult.collect()
+    val processingResult : DataStream[(Double, Double, Int)] = op.processJoinStream(inputData)
+    val resultIt : Iterator[(Double, Double, Int)] = processingResult.collect()
     val result = resultIt.toList
     val expected : Seq[(Int, Int, Int)] = List((0, 2, 0), (3, 5, 0), (6, 8, 0), (9, 11, 0))
     assert(result === expected, "Result should match")
@@ -94,8 +94,8 @@ class SAXOperationTest  extends FunSuite with Matchers {
       )
     )
 
-    val xValuesInput : DataStream[(Int, Int, Int)] = this.streamingEnv.fromCollection(
-      Seq((0, 1, 0), (2, 3, 0), (4, 5, 0), (6, 7, 0), (8, 9, 0), (10, 11, 0))
+    val xValuesInput : DataStream[(Double, Double, Int)] = this.streamingEnv.fromCollection(
+      Seq((0.0, 1.0, 0), (2.0, 3.0, 0), (4.0, 5.0, 0), (6.0, 7.0, 0), (8.0, 9.0, 0), (10.0, 11.0, 0))
     )
 
     val op = this.getSAXOperation()
