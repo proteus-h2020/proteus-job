@@ -22,7 +22,7 @@
 
 
 	<groupId>eu.proteus</groupId>
-	<artifactId>proteus-job_2.10</artifactId>
+	<artifactId>proteus-job_2.11</artifactId>
 	<name>proteus-job</name>
 	<version>0.1-SNAPSHOT</version>
 
@@ -35,8 +35,8 @@
 		<scala.macros.version>2.0.1</scala.macros.version>
 		<log4j.configuration>log4j-test.properties</log4j.configuration>
 		<flink.version>1.4-SNAPSHOT</flink.version>
-		<scala.version>2.10.6</scala.version>
-		<scala.binary.version>2.10</scala.binary.version>
+		<scala.version>2.11.8</scala.version>
+		<scala.binary.version>2.11</scala.binary.version>
 		<metrics.version>3.1.0</metrics.version>
 		<junit.version>4.12</junit.version>
 		<mockito.version>1.10.19</mockito.version>
@@ -684,8 +684,19 @@
 				<version>3.2.2</version>
 				<executions>
 					<execution>
+						<id>scala-compile-first</id>
+						<phase>process-resources</phase>
 						<goals>
 							<goal>compile</goal>
+						</goals>
+					</execution>
+
+					<!-- Run scala compiler in the process-test-resources phase, so that dependencies on
+						 scala classes can be resolved later in the (Java) test-compile phase -->
+					<execution>
+						<id>scala-test-compile</id>
+						<phase>process-test-resources</phase>
+						<goals>
 							<goal>testCompile</goal>
 						</goals>
 					</execution>
