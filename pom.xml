@@ -44,7 +44,7 @@
 		<slf4j.version>1.7.7</slf4j.version>
 		<log4j.version>1.2.17</log4j.version>
 		<solma.version>0.1-SNAPSHOT</solma.version>
-		<kafka.version>0.10.0.1</kafka.version>
+		<kafka.version>0.10.2.1</kafka.version>
 		<kafka.version.major>0.10</kafka.version.major>
 	</properties>
 

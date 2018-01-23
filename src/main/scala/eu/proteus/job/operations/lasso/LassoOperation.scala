@@ -61,8 +61,11 @@ class AggregateFlatnessValuesWindowFunction extends ProcessWindowFunction[CoilMe
 
 }
 
-class LassoOperation (targetVariable: String, workerParallelism: Int, psParallelism: Int, pullLimit: Int,
-                      featureCount: Int, rangePartitioning: Boolean, allowedLateness: Long, iterationWaitTime: Long) {
+class LassoOperation(
+    targetVariable: String, workerParallelism: Int,
+    psParallelism: Int, pullLimit: Int,
+    featureCount: Int, rangePartitioning: Boolean,
+    allowedLateness: Long, iterationWaitTime: Long) extends Serializable {
 
   /**
     * Launch the Lasso operation for a given variable.

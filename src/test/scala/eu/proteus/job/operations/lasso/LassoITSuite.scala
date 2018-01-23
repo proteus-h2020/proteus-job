@@ -20,24 +20,18 @@ import java.lang.reflect.Field
 import java.util.{Properties, UUID}
 
 import eu.proteus.job.operations.data.model.{CoilMeasurement, SensorMeasurement1D, SensorMeasurement2D}
-import eu.proteus.job.operations.data.results.LassoResult
 import eu.proteus.job.operations.data.serializer.CoilMeasurementKryoSerializer
 import eu.proteus.job.operations.data.serializer.schema.UntaggedObjectSerializationSchema
 import grizzled.slf4j.Logger
 import kafka.common.NotLeaderForPartitionException
 import org.apache.flink.api.common.restartstrategy.RestartStrategies
-import org.apache.flink.api.common.typeinfo.TypeInformation
-import org.apache.flink.client.program.ProgramInvocationException
 import org.apache.flink.ml.math.{DenseVector => FlinkDenseVector}
-import org.apache.flink.runtime.client.JobExecutionException
 import org.apache.flink.runtime.minicluster.LocalFlinkMiniCluster
-import org.apache.flink.streaming.api.functions.sink.SinkFunction
 import org.apache.flink.streaming.api.functions.source.SourceFunction.SourceContext
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaProducerBase, KafkaTestBase, KafkaTestEnvironment}
 import org.apache.flink.streaming.connectors.kafka.testutils.JobManagerCommunicationUtils
-import org.apache.flink.streaming.util.serialization.{KeyedSerializationSchemaWrapper, TypeInformationSerializationSchema}
-import org.apache.flink.test.util.SuccessException
+import org.apache.flink.streaming.util.serialization.KeyedSerializationSchemaWrapper
 import org.apache.flink.testutils.junit.RetryOnException
 import org.junit.Test
 import org.scalatest.junit.JUnitSuiteLike
@@ -53,6 +47,8 @@ class LassoITSuite
   import LassoITSuite._
 
   private [lasso] val LOG = Logger(getClass)
+
+  // scalastyle:off
 
   @Test
   def runLassoIntegrationWithKafka(): Unit = {
@@ -178,6 +174,7 @@ class LassoITSuite
 
   }
 
+  // scalastyle:on
 
 }
 
