@@ -25,7 +25,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.java.typeutils.runtime.kryo.KryoSerializer
 import org.apache.flink.api.java.typeutils.runtime.{DataInputViewStream, DataOutputViewStream, NoFetchingInput}
 import org.apache.flink.core.memory.{DataInputDeserializer, DataOutputSerializer}
-import org.apache.flink.api.common.serialization.{DeserializationSchema, SerializationSchema}
+import org.apache.flink.streaming.util.serialization.{DeserializationSchema, SerializationSchema}
 
 import scala.reflect.ClassTag
 
