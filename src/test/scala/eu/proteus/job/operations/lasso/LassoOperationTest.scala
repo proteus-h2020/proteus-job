@@ -25,8 +25,6 @@ import org.apache.flink.ml.math.{DenseVector => FlinkDenseVector}
 import org.apache.flink.api.scala.createTypeInformation
 import org.scalatest.{FunSuite, Matchers}
 
-
-
 import scala.collection.JavaConversions.asScalaBuffer
 
 
@@ -78,9 +76,7 @@ class LassoOperationTest extends FunSuite with Matchers {
 
     val processingResult: DataStream[LassoResult] = op.runLasso(inputMeasurement, inputFlatness)
 
-    //val resultIt = processingResult.collect()
-
-    assert("hola" === "hola", "Result should match")
+    LassoOperationTest.env.execute()
   }
 
 }

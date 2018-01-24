@@ -23,6 +23,7 @@ import eu.proteus.solma.lasso.Lasso.{LassoModel, LassoParam}
 import eu.proteus.solma.lasso.{LassoDFPredictOperation, LassoDFStreamTransformOperation, LassoDelayedFeedbacks, LassoModelBuilder}
 import eu.proteus.solma.lasso.LassoStreamEvent.LassoStreamEvent
 import eu.proteus.solma.lasso.algorithm.LassoParameterInitializer.initConcrete
+import breeze.linalg.{Vector => BreezeVector}
 import org.apache.flink.ml.common.ParameterMap
 import org.apache.flink.ml.math.{DenseVector, Vector}
 import org.apache.flink.streaming.api.scala.function.ProcessWindowFunction
@@ -30,7 +31,7 @@ import org.apache.flink.streaming.api.functions.co.CoFlatMapFunction
 import org.apache.flink.streaming.api.functions.sink.RichSinkFunction
 import org.apache.flink.streaming.api.scala.DataStream
 import org.apache.flink.streaming.api.scala._
-import org.apache.flink.streaming.api.windowing.assigners.EventTimeSessionWindows
+import org.apache.flink.streaming.api.windowing.assigners.ProcessingTimeSessionWindows
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow
 import org.apache.flink.util.Collector
@@ -52,7 +53,7 @@ class AggregateFlatnessValuesWindowFunction extends ProcessWindowFunction[CoilMe
                        out: Collector[LassoStreamEvent]): Unit = {
     val iter = in.toList
     val poses: List[Double] = iter.map(x => x.slice.head.toDouble)
-    val labels: DenseVector = new DenseVector(iter.map(x => x.data(x.slice.head)).toArray)
+    val labels: DenseVector = new DenseVector(iter.map(x => x.data.head._2).toArray)
     val flat: FlatnessMeasurement =
       FlatnessMeasurement(poses, iter.head.coilId, labels, in.head.slice, in.head.data)
     val ev: StreamEventLabel[Long, Double] = flat
@@ -89,14 +90,16 @@ class LassoOperation(
         rangePartitioning, iterationWaitTime, allowedLateness)
     }
 
-    val processedFlatnessStream = flatnessStream.filter(x => x.slice.head != varId).keyBy(x => x.coilId)
-      .window(EventTimeSessionWindows.withGap(Time.seconds(allowedLateness)))
+    val processedFlatnessStream = flatnessStream.filter(x => x.slice.head == varId).keyBy(x => x.coilId)
+      .window(ProcessingTimeSessionWindows.withGap(Time.seconds(allowedLateness)))
       .process(new AggregateFlatnessValuesWindowFunction())
 
     def toLassoStreamEvent(in: CoilMeasurement): LassoStreamEvent = {
       val coilID = in.coilId
       val xCoord = in.slice.head
-      val vector = in.data
+      val breezeVector = BreezeVector.zeros[Double](featureCount)
+      breezeVector(in.slice.head) = in.data.head._2
+      val vector = new DenseVector(breezeVector.toArray)
       val slice = in.slice
       val ev: StreamEventWithPos[(Long, Double)] = SensorMeasurement((coilID, xCoord), slice, vector)
       Left(ev)
@@ -125,10 +128,10 @@ class LassoOperation(
           case Left(ev) => Some(Left(ev))
           case Right(ev) => None
         }
-    }.filter(x => x.isEmpty).map(x => x.get)
+    }.filter(x => x.isDefined).map(x => x.get)
 
     val predictResults = lasso.predict[LassoStreamEvent, Option[((Long, Double), Double)] ](unlabeledVectors,
-      ParameterMap.Empty).filter(x => x.isEmpty).map(x => x.get)
+      ParameterMap.Empty).filter(x => x.isDefined).map(x => x.get)
 
     val modelResults = lasso.transform[LassoStreamEvent, Either[((Long, Double), Double),
       (Int, LassoParam)] ](allEvents, ParameterMap.Empty)
