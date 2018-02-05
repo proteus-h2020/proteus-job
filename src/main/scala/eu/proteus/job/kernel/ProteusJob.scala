@@ -219,13 +219,13 @@ object ProteusJob {
       val variables = parameters.getRequired("lasso-variable").split(",")
       val lassoSinkSchema = new UntaggedObjectSerializationSchema[LassoResult](env.getConfig)
 
-      val workerParallelism = 1
-      val psParallelism = 1
-      val pullLimit = 10000
-      val featureCount = 76
-      val rangePartitioning = true
-      val allowedLateness = 10000
-      val iterationWaitTime: Long = 10000
+      val workerParallelism = parameters.getRequired("lasso-variable").toInt
+      val psParallelism = parameters.getRequired("lasso-variable").toInt
+      val pullLimit = parameters.getRequired("lasso-variable").toInt
+      val featureCount = parameters.getRequired("lasso-variable").toInt
+      val rangePartitioning = parameters.getRequired("lasso-variable").toBoolean
+      val allowedLateness = parameters.getRequired("lasso-variable").toInt
+      val iterationWaitTime: Long = parameters.getRequired("lasso-variable").toLong
 
       variables.foreach{
         varName =>
@@ -263,7 +263,13 @@ object ProteusJob {
     System.out.println("--sax-model-storage-path\tThe path where the trained dictionary will be stored")
     System.out.println("--sax-variable\tThe variable to be analyzed by SAX. Supports lists with comma")
     System.out.println("--lasso-variable\tThe variable to be analyzed by Lasso. Supports lists with comma")
-
+    System.out.println("--lasso-workers\tNumber of workers")
+    System.out.println("--lasso-ps\tParameter server parallelism")
+    System.out.println("--lasso-pull-limit\tPull limit")
+    System.out.println("--lasso-features\tNumber of features")
+    System.out.println("--lasso-range-partitioning\tRange partitioning (boolean)")
+    System.out.println("--lasso-allwoed-lateness\tAllowed lateness")
+    System.out.println("--lasso-iteration-wait-time\tIteration wait time")
   }
 
   def main(args: Array[String]): Unit = {

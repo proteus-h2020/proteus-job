@@ -30,7 +30,7 @@ import org.apache.flink.client.program.ProgramInvocationException
 import org.apache.flink.ml.math.{DenseVector => FlinkDenseVector}
 import org.apache.flink.runtime.client.JobExecutionException
 import org.apache.flink.runtime.minicluster.LocalFlinkMiniCluster
-import org.apache.flink.streaming.api.functions.sink.{RichSinkFunction, SinkFunction}
+import org.apache.flink.streaming.api.functions.sink.RichSinkFunction
 import org.apache.flink.streaming.api.functions.source.SourceFunction.SourceContext
 import org.apache.flink.streaming.api.scala._
 import org.apache.flink.streaming.connectors.kafka.{FlinkKafkaProducerBase, KafkaTestBase, KafkaTestEnvironment}
@@ -61,7 +61,7 @@ class LassoITSuite
     val topicMeasurement = "kafkaProducerConsumerTopicMeasurement_" + UUID.randomUUID.toString
     val topicFlatness = "kafkaProducerConsumerTopicFlatness_" + UUID.randomUUID.toString
 
-    val sourceAndSinkparallelism = 4
+    val sourceAndSinkparallelism = 1
     val lassoParallelism = 1
 
     JobManagerCommunicationUtils.waitUntilNoJobIsRunning(flink.getLeaderGateway(timeout))
@@ -102,15 +102,15 @@ class LassoITSuite
     producerProperties.putAll(secureProps)
 
     kafkaServer.produceIntoKafka(
-      streamMeasurement.javaStream,
-      topicMeasurement,
+      streamFlatness.javaStream,
+      topicFlatness,
       new KeyedSerializationSchemaWrapper[CoilMeasurement](schema),
       producerProperties,
       null)
 
     kafkaServer.produceIntoKafka(
-      streamFlatness.javaStream,
-      topicFlatness,
+      streamMeasurement.javaStream,
+      topicMeasurement,
       new KeyedSerializationSchemaWrapper[CoilMeasurement](schema),
       producerProperties,
       null)
@@ -128,13 +128,13 @@ class LassoITSuite
 
     env.setParallelism(lassoParallelism)
 
-    val workerParallelism = 1
+    val workerParallelism = 4
     val psParallelism = 1
     val pullLimit = 10
     val featureCount = 76
     val rangePartitioning = true
     val allowedLateness = 10
-    val iterationWaitTime: Long = 10
+    val iterationWaitTime: Long = 20000
     val varName = "C0028"
 
     val operation = new LassoOperation(varName, workerParallelism, psParallelism, pullLimit, featureCount,
@@ -146,7 +146,7 @@ class LassoITSuite
       var e = 0
       override def invoke(in: LassoResult): Unit = {
         e += 1
-        if (e >= 1) {
+        if (e >= LassoITSuite.dataMeasurement.length) {
           throw new SuccessException
         }
       }
@@ -191,27 +191,22 @@ object LassoITSuite {
 
 
   val dataMeasurement = Seq(
-    SensorMeasurement1D(0, 12.0, 0 to 0, FlinkDenseVector(1.0)),
-    SensorMeasurement1D(1, 13.0, 1 to 1, FlinkDenseVector(1.2)),
-    SensorMeasurement1D(4, 14.0, 0 to 0, FlinkDenseVector(1.5)),
-    SensorMeasurement1D(1, 17.0, 1 to 1, FlinkDenseVector(1.1)),
-    SensorMeasurement1D(0, 18.0, 0 to 0, FlinkDenseVector(1.0)),
-    SensorMeasurement1D(2, 19.0, 3 to 3, FlinkDenseVector(1.2)),
-    SensorMeasurement1D(2, 20.0, 3 to 3, FlinkDenseVector(1.0)),
-    SensorMeasurement1D(4, 21.0, 0 to 0, FlinkDenseVector(1.4)),
-    SensorMeasurement1D(2, 22.0, 3 to 3, FlinkDenseVector(1.0))
+    SensorMeasurement1D(0, 5.0, 0 to 0, FlinkDenseVector(1.0)),
+    SensorMeasurement1D(0, 6.0, 1 to 1, FlinkDenseVector(1.2)),
+    SensorMeasurement1D(1, 4.0, 0 to 0, FlinkDenseVector(1.5)),
+    SensorMeasurement1D(1, 8.0, 1 to 1, FlinkDenseVector(1.1)),
+    SensorMeasurement1D(2, 2.0, 2 to 2, FlinkDenseVector(1.0)),
+    SensorMeasurement1D(2, 3.0, 0 to 0, FlinkDenseVector(1.2)),
+    SensorMeasurement1D(2, 12.0, 1 to 1, FlinkDenseVector(1.0))
   )
 
   val dataFlatness = Seq(
     SensorMeasurement1D(0, 12.0, 28 to 28, FlinkDenseVector(1.0)),
-    SensorMeasurement1D(1, 13.0, 28 to 28, FlinkDenseVector(1.2)),
-    SensorMeasurement1D(4, 14.0, 28 to 28, FlinkDenseVector(1.5)),
+    SensorMeasurement1D(0, 13.0, 28 to 28, FlinkDenseVector(1.2)),
+    SensorMeasurement1D(1, 14.0, 28 to 28, FlinkDenseVector(1.5)),
     SensorMeasurement1D(1, 17.0, 28 to 28, FlinkDenseVector(1.1)),
-    SensorMeasurement1D(0, 18.0, 28 to 28, FlinkDenseVector(1.0)),
-    SensorMeasurement1D(2, 19.0, 28 to 28, FlinkDenseVector(1.2)),
-    SensorMeasurement1D(2, 20.0, 28 to 28, FlinkDenseVector(1.0)),
-    SensorMeasurement1D(4, 21.0, 28 to 28, FlinkDenseVector(1.4)),
-    SensorMeasurement1D(2, 22.0, 28 to 28, FlinkDenseVector(1.0))
+    SensorMeasurement1D(2, 18.0, 28 to 28, FlinkDenseVector(1.0)),
+    SensorMeasurement1D(2, 19.0, 28 to 28, FlinkDenseVector(1.2))
   )
 
   private def extractField(field: String): Field = {

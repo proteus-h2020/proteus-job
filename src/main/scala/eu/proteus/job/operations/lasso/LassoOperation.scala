@@ -16,22 +16,20 @@
 
 package eu.proteus.job.operations.lasso
 
-import eu.proteus.job.operations.data.model.CoilMeasurement
+import eu.proteus.job.operations.data.model.{CoilMeasurement, SensorMeasurement1D, SensorMeasurement2D}
 import eu.proteus.job.operations.data.results.LassoResult
 import eu.proteus.solma.events.{StreamEventLabel, StreamEventWithPos}
-import eu.proteus.solma.lasso.Lasso.{LassoModel, LassoParam}
-import eu.proteus.solma.lasso.{LassoDFPredictOperation, LassoDFStreamTransformOperation, LassoDelayedFeedbacks, LassoModelBuilder}
+import eu.proteus.solma.lasso.Lasso.LassoParam
+import eu.proteus.solma.lasso.{LassoDFStreamTransformOperation, LassoDelayedFeedbacks}
 import eu.proteus.solma.lasso.LassoStreamEvent.LassoStreamEvent
-import eu.proteus.solma.lasso.algorithm.LassoParameterInitializer.initConcrete
 import breeze.linalg.{Vector => BreezeVector}
 import org.apache.flink.ml.common.ParameterMap
 import org.apache.flink.ml.math.{DenseVector, Vector}
 import org.apache.flink.streaming.api.scala.function.ProcessWindowFunction
 import org.apache.flink.streaming.api.functions.co.CoFlatMapFunction
-import org.apache.flink.streaming.api.functions.sink.RichSinkFunction
 import org.apache.flink.streaming.api.scala.DataStream
 import org.apache.flink.streaming.api.scala._
-import org.apache.flink.streaming.api.windowing.assigners.ProcessingTimeSessionWindows
+import org.apache.flink.streaming.api.windowing.assigners.{ProcessingTimeSessionWindows, TumblingEventTimeWindows}
 import org.apache.flink.streaming.api.windowing.time.Time
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow
 import org.apache.flink.util.Collector
@@ -52,7 +50,12 @@ class AggregateFlatnessValuesWindowFunction extends ProcessWindowFunction[CoilMe
   override def process(key: Int, context: Context, in: Iterable[CoilMeasurement],
                        out: Collector[LassoStreamEvent]): Unit = {
     val iter = in.toList
-    val poses: List[Double] = iter.map(x => x.slice.head.toDouble)
+    val poses: List[Double] = iter.map{
+      x => x match {
+          case s1d: SensorMeasurement1D => s1d.x
+          case s2d: SensorMeasurement2D => s2d.x
+        }
+    }
     val labels: DenseVector = new DenseVector(iter.map(x => x.data.head._2).toArray)
     val flat: FlatnessMeasurement =
       FlatnessMeasurement(poses, iter.head.coilId, labels, in.head.slice, in.head.data)
@@ -85,18 +88,17 @@ class LassoOperation(
         rangePartitioning, iterationWaitTime, allowedLateness)
     }
 
-    implicit def predictImplementation[K <: LassoStreamEvent] = {
-      new LassoDFPredictOperation[K](workerParallelism, psParallelism, pullLimit, featureCount,
-        rangePartitioning, iterationWaitTime, allowedLateness)
-    }
-
     val processedFlatnessStream = flatnessStream.filter(x => x.slice.head == varId).keyBy(x => x.coilId)
       .window(ProcessingTimeSessionWindows.withGap(Time.seconds(allowedLateness)))
+      //.window(TumblingEventTimeWindows.of(Time.seconds(5)))
       .process(new AggregateFlatnessValuesWindowFunction())
 
     def toLassoStreamEvent(in: CoilMeasurement): LassoStreamEvent = {
       val coilID = in.coilId
-      val xCoord = in.slice.head
+      val xCoord = in match {
+        case s1d: SensorMeasurement1D => s1d.x
+        case s2d: SensorMeasurement2D => s2d.x
+      }
       val breezeVector = BreezeVector.zeros[Double](featureCount)
       breezeVector(in.slice.head) = in.data.head._2
       val vector = new DenseVector(breezeVector.toArray)
@@ -122,44 +124,21 @@ class LassoOperation(
     }
     )
 
-    val unlabeledVectors: DataStream[LassoStreamEvent] = allEvents.map{
-      x =>
-        x match {
-          case Left(ev) => Some(Left(ev))
-          case Right(ev) => None
-        }
-    }.filter(x => x.isDefined).map(x => x.get)
-
-    val predictResults = lasso.predict[LassoStreamEvent, Option[((Long, Double), Double)] ](unlabeledVectors,
-      ParameterMap.Empty).filter(x => x.isDefined).map(x => x.get)
-
     val modelResults = lasso.transform[LassoStreamEvent, Either[((Long, Double), Double),
       (Int, LassoParam)] ](allEvents, ParameterMap.Empty)
 
-    modelResults.addSink(new RichSinkFunction[Either[((Long, Double), Double), (Int, LassoParam)]] {
-      var lassoModel: LassoModel = initConcrete(1.0, 0.0, featureCount)(0)
-      val modelBuilder = new LassoModelBuilder(lassoModel)
-
-      override def invoke(value: Either[((Long, Double), Double), (Int, LassoParam)]): Unit = {
-        value match {
-          case Right((id, modelValue)) =>
-            lassoModel = modelBuilder.add(id, modelValue)
-          case Left(label) =>
-          // prediction channel is deaf
-        }
-      }
-
-      override def close(): Unit = {
-      }
-    })
-
-    predictResults.map{
+    val onlyResults: DataStream[Option[LassoResult]] = modelResults.map{
       x =>
-        val coilId: Long = x._1._1
-        val xCoord: Double = x._1._2
-        val label: Double = x._2
+        x match {
+          case Left(y) =>
+            val coilId: Long = y._1._1
+            val xCoord: Double = y._1._2
+            val label: Double = y._2
 
-        new LassoResult(coilId, varId, xCoord, label)
+            Some(new LassoResult(coilId, varId, xCoord, label))
+          case Right(y) => None
+        }
     }
+    onlyResults.filter(x => x.nonEmpty).map(x => x.get)
   }
 }
