@@ -204,7 +204,7 @@ class LinkOutputsFunction(targetVariable: String)
       prediction.key, this.targetVariable, coords._1, coords._2, prediction.classId, prediction.similarity))
   }
 
-  override def flatMap2(in2: (Double, Double, Int), collector: Collector[SAXResult]) = {
+  override def flatMap2(in2: (Double, Double, Int), collector: Collector[SAXResult]): Unit = {
     val key = in2._3
     if(this.orphanPredictions.contains(key) && this.orphanPredictions.get(key).nonEmpty){
       val queue = this.orphanPredictions.get(key)
@@ -224,10 +224,7 @@ class LinkOutputsFunction(targetVariable: String)
 
   }
 
-  override def flatMap1(
-    in1: SAXPrediction,
-    collector: Collector[SAXResult]): Unit = {
-
+  override def flatMap1(in1: SAXPrediction, collector: Collector[SAXResult]): Unit = {
     val key = in1.key
     if(this.coordsMap.contains(key) && this.coordsMap.get(key).nonEmpty){
       val queue = this.coordsMap.get(key)

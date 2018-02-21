@@ -21,11 +21,10 @@ import java.util.{Map => JMap}
 import java.util.Properties
 
 import eu.proteus.job.operations.data.model.{CoilMeasurement, SensorMeasurement1D, SensorMeasurement2D}
-import eu.proteus.job.operations.data.results.SAXResult
-import eu.proteus.job.operations.data.results.{MomentsResult, MomentsResult1D, MomentsResult2D}
-import eu.proteus.job.operations.data.serializer.SAXResultKryoSerializer
+import eu.proteus.job.operations.data.results._
+import eu.proteus.job.operations.data.serializer.{CoilMeasurementKryoSerializer, LassoResultKryoSerializer, MomentsResultKryoSerializer, SAXResultKryoSerializer}
 import eu.proteus.job.operations.data.serializer.schema.UntaggedObjectSerializationSchema
-import eu.proteus.job.operations.data.serializer.{CoilMeasurementKryoSerializer, MomentsResultKryoSerializer}
+import eu.proteus.job.operations.lasso.LassoOperation
 import eu.proteus.job.operations.moments.MomentsOperation
 import eu.proteus.job.operations.sax.SAXOperation
 import eu.proteus.solma
@@ -52,7 +51,13 @@ object ProteusJob {
    */
   private val LinkSAX : Boolean = true
 
+  /**
+    * Flag to launch the Lasso operation. Use this flag for debugging purposes.
+    */
+  private val LinkLasso : Boolean = true
+
   private val SAXJobs : JMap[String, SAXOperation] = new JHashMap[String, SAXOperation]()
+  private val LassoJobs : JMap[String, LassoOperation] = new JHashMap[String, LassoOperation]()
 
   private [kernel] val LOG = Logger(getClass)
   private [kernel] val ONE_MEGABYTE = 1024 * 1024
@@ -63,6 +68,8 @@ object ProteusJob {
   private [kernel] var kafkaBootstrapServer = "localhost:2181"
   // private [kernel] var realtimeDataKafkaTopic = "proteus-realtime"
   private [kernel] var realtimeDataKafkaTopic = "proteus-realtime"
+  // private [kernel] var flatnessDataKafkaTopic = "proteus-flatness"
+  private [kernel] var flatnessDataKafkaTopic = "proteus-flatness"
   private [kernel] var jobStackBackendType = "memory"
 
   // flink config
@@ -121,6 +128,7 @@ object ProteusJob {
     cfg.registerKryoType(classOf[MomentsResult2D])
     cfg.registerKryoType(classOf[solma.moments.MomentsEstimator.Moments])
     cfg.registerKryoType(classOf[SAXResult])
+    cfg.registerKryoType(classOf[LassoResult])
 
     // register serializers
     env.addDefaultKryoSerializer(classOf[CoilMeasurement], classOf[CoilMeasurementKryoSerializer])
@@ -130,6 +138,7 @@ object ProteusJob {
     env.addDefaultKryoSerializer(classOf[MomentsResult1D], classOf[MomentsResultKryoSerializer])
     env.addDefaultKryoSerializer(classOf[MomentsResult2D], classOf[MomentsResultKryoSerializer])
     env.addDefaultKryoSerializer(classOf[SAXResult], classOf[SAXResultKryoSerializer])
+    env.addDefaultKryoSerializer(classOf[LassoResult], classOf[LassoResultKryoSerializer])
 
     env.addDefaultKryoSerializer(classOf[mutable.Queue[_]],
       classOf[com.twitter.chill.TraversableSerializer[_, mutable.Queue[_]]])
@@ -151,17 +160,24 @@ object ProteusJob {
     implicit val inputTypeInfo = createTypeInformation[CoilMeasurement]
     val inputSchema = new UntaggedObjectSerializationSchema[CoilMeasurement](env.getConfig)
 
-    // add kafka source
+    // add kafka realtimeSource
 
-    val source: DataStream[CoilMeasurement] = env.addSource(new FlinkKafkaConsumer010[CoilMeasurement](
+    val realtimeSource: DataStream[CoilMeasurement] = env.addSource(new FlinkKafkaConsumer010[CoilMeasurement](
         realtimeDataKafkaTopic,
+        inputSchema,
+        loadConsumerKafkaProperties))
+
+    // add kafka flatnessSource
+
+    val flatnessSource: DataStream[CoilMeasurement] = env.addSource(new FlinkKafkaConsumer010[CoilMeasurement](
+        flatnessDataKafkaTopic,
         inputSchema,
         loadConsumerKafkaProperties))
 
     // simple moments
     if(ProteusJob.LinkMoments){
       LOG.info("Moments output topic: simple-moments")
-      val moments = MomentsOperation.runSimpleMomentsAnalytics(source, 54)
+      val moments = MomentsOperation.runSimpleMomentsAnalytics(realtimeSource, 54)
       implicit val momentsTypeInfo = createTypeInformation[MomentsResult]
       val momentsSinkSchema = new UntaggedObjectSerializationSchema[MomentsResult](env.getConfig)
 
@@ -185,7 +201,7 @@ object ProteusJob {
           parameters.getRequired("sax-model-storage-path"),
           varName
         )
-        val saxJobResult = saxJob.runSAX(source)
+        val saxJobResult = saxJob.runSAX(realtimeSource)
         this.SAXJobs.put(varName, saxJob)
         val outputProducer = FlinkKafkaProducer010.writeToKafkaWithTimestamps(
           saxJobResult.javaStream,
@@ -197,6 +213,36 @@ object ProteusJob {
       })
 
       // Console.println("ThePlan:" + env.getExecutionPlan)
+    }
+
+    if(ProteusJob.LinkLasso){
+      val variables = parameters.getRequired("lasso-variable").split(",")
+      val lassoSinkSchema = new UntaggedObjectSerializationSchema[LassoResult](env.getConfig)
+
+      val workerParallelism = parameters.getRequired("lasso-variable").toInt
+      val psParallelism = parameters.getRequired("lasso-variable").toInt
+      val pullLimit = parameters.getRequired("lasso-variable").toInt
+      val featureCount = parameters.getRequired("lasso-variable").toInt
+      val rangePartitioning = parameters.getRequired("lasso-variable").toBoolean
+      val allowedLateness = parameters.getRequired("lasso-variable").toInt
+      val iterationWaitTime: Long = parameters.getRequired("lasso-variable").toLong
+
+      variables.foreach{
+        varName =>
+          val lassoJob = new LassoOperation(varName, workerParallelism, psParallelism, pullLimit, featureCount,
+            rangePartitioning, allowedLateness, iterationWaitTime)
+
+          val lassoJobResult = lassoJob.runLasso(realtimeSource, flatnessSource)
+          LassoJobs.put(varName, lassoJob)
+          val outputProducer = FlinkKafkaProducer010.writeToKafkaWithTimestamps(
+            lassoJobResult.javaStream,
+            "lasso-results",
+            lassoSinkSchema,
+            loadBaseKafkaProperties)
+          outputProducer.setLogFailuresOnly(false)
+          outputProducer.setFlushOnCheckpoint(true)
+      }
+
     }
 
     // execute the job
@@ -216,7 +262,14 @@ object ProteusJob {
       "stores rocksdb checkpoints, e.g., hdfs://namenode:9000/flink-checkpoints/")
     System.out.println("--sax-model-storage-path\tThe path where the trained dictionary will be stored")
     System.out.println("--sax-variable\tThe variable to be analyzed by SAX. Supports lists with comma")
-
+    System.out.println("--lasso-variable\tThe variable to be analyzed by Lasso. Supports lists with comma")
+    System.out.println("--lasso-workers\tNumber of workers")
+    System.out.println("--lasso-ps\tParameter server parallelism")
+    System.out.println("--lasso-pull-limit\tPull limit")
+    System.out.println("--lasso-features\tNumber of features")
+    System.out.println("--lasso-range-partitioning\tRange partitioning (boolean)")
+    System.out.println("--lasso-allwoed-lateness\tAllowed lateness")
+    System.out.println("--lasso-iteration-wait-time\tIteration wait time")
   }
 
   def main(args: Array[String]): Unit = {
