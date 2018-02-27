@@ -219,13 +219,13 @@ object ProteusJob {
       val variables = parameters.getRequired("lasso-variable").split(",")
       val lassoSinkSchema = new UntaggedObjectSerializationSchema[LassoResult](env.getConfig)
 
-      val workerParallelism = parameters.getRequired("lasso-variable").toInt
-      val psParallelism = parameters.getRequired("lasso-variable").toInt
-      val pullLimit = parameters.getRequired("lasso-variable").toInt
-      val featureCount = parameters.getRequired("lasso-variable").toInt
-      val rangePartitioning = parameters.getRequired("lasso-variable").toBoolean
-      val allowedLateness = parameters.getRequired("lasso-variable").toInt
-      val iterationWaitTime: Long = parameters.getRequired("lasso-variable").toLong
+      val workerParallelism = parameters.getRequired("lasso-workers").toInt
+      val psParallelism = parameters.getRequired("lasso-ps").toInt
+      val pullLimit = parameters.getRequired("lasso-pull-limit").toInt
+      val featureCount = parameters.getRequired("lasso-features").toInt
+      val rangePartitioning = parameters.getRequired("lasso-range-partitioning").toBoolean
+      val allowedLateness = parameters.getRequired("lasso-allowed-lateness").toInt
+      val iterationWaitTime: Long = parameters.getRequired("lasso-iteration-wait-time").toLong
 
       variables.foreach{
         varName =>
@@ -268,7 +268,7 @@ object ProteusJob {
     System.out.println("--lasso-pull-limit\tPull limit")
     System.out.println("--lasso-features\tNumber of features")
     System.out.println("--lasso-range-partitioning\tRange partitioning (boolean)")
-    System.out.println("--lasso-allwoed-lateness\tAllowed lateness")
+    System.out.println("--lasso-allowed-lateness\tAllowed lateness")
     System.out.println("--lasso-iteration-wait-time\tIteration wait time")
   }
 
