@@ -77,6 +77,7 @@ object ProteusJob {
   private [kernel] var memoryBackendMBSize = 20
   private [kernel] var flinkCheckpointsInterval = 10
   private [kernel] var enableExaclyOnceGuarantees = false
+  private [kernel] var iterativeJob = true
 
 
   def loadBaseKafkaProperties = {
@@ -115,7 +116,14 @@ object ProteusJob {
       CheckpointingMode.AT_LEAST_ONCE
     }
 
-    env.enableCheckpointing(timeout, checkpointingMode)
+    /*
+      NOTE: Checkpointing iterative streaming dataflows in not properly supported at
+    * the moment. If the "force" parameter is set to true, the system will execute the
+    * job nonetheless.
+    * */
+    val force = iterativeJob
+
+    env.enableCheckpointing(timeout, checkpointingMode, force)
 
     val cfg = env.getConfig
 
