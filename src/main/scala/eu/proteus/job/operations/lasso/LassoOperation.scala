@@ -65,6 +65,34 @@ class AggregateFlatnessValuesWindowFunction extends ProcessWindowFunction[CoilMe
 
 }
 
+
+class AggregateMeasurementValuesWindowFunction extends ProcessWindowFunction[CoilMeasurement, LassoStreamEvent, Int, TimeWindow] {
+  override def process(key: Int, context: Context, in: Iterable[CoilMeasurement], out: Collector[LassoStreamEvent]): Unit = {
+
+
+    val iter = in.toList
+    val xCoord = iter.head match {
+      case s1d: SensorMeasurement1D => s1d.x
+      case s2d: SensorMeasurement2D => s2d.x
+    }
+
+    // TODO: pass the featureCount parameter to this function ?¿
+    // val breezeVector = BreezeVector.zeros[Double](featureCount)
+    val breezeVector = BreezeVector.zeros[Double](76)
+
+    iter.foreach(measure => {
+      breezeVector(measure.slice.head) = measure.data.head._2
+    })
+
+    val vector = new DenseVector(breezeVector.toArray)
+
+    val sensor: SensorMeasurement = SensorMeasurement((iter.head.coilId, xCoord), in.head.slice, vector)
+    val ev: StreamEventWithPos[(Long, Double)] = sensor
+
+    out.collect(Left(ev))
+  }
+}
+
 class LassoOperation(
     targetVariable: String, workerParallelism: Int,
     psParallelism: Int, pullLimit: Int,
@@ -90,24 +118,11 @@ class LassoOperation(
 
     val processedFlatnessStream = flatnessStream.filter(x => x.slice.head == varId).keyBy(x => x.coilId)
       .window(ProcessingTimeSessionWindows.withGap(Time.seconds(allowedLateness)))
-      //.window(TumblingEventTimeWindows.of(Time.seconds(5)))
       .process(new AggregateFlatnessValuesWindowFunction())
 
-    def toLassoStreamEvent(in: CoilMeasurement): LassoStreamEvent = {
-      val coilID = in.coilId
-      val xCoord = in match {
-        case s1d: SensorMeasurement1D => s1d.x
-        case s2d: SensorMeasurement2D => s2d.x
-      }
-      val breezeVector = BreezeVector.zeros[Double](featureCount)
-      breezeVector(in.slice.head) = in.data.head._2
-      val vector = new DenseVector(breezeVector.toArray)
-      val slice = in.slice
-      val ev: StreamEventWithPos[(Long, Double)] = SensorMeasurement((coilID, xCoord), slice, vector)
-      Left(ev)
-    }
-
-    val processedMeasurementStream = measurementStream.map{x => toLassoStreamEvent(x)}
+    val processedMeasurementStream = measurementStream.keyBy(x => x.coilId)
+      .window(ProcessingTimeSessionWindows.withGap(Time.seconds(allowedLateness)))
+      .process(new AggregateMeasurementValuesWindowFunction())
 
     val connectedStreams = processedMeasurementStream.connect(processedFlatnessStream)
 
