@@ -66,8 +66,8 @@ class AggregateFlatnessValuesWindowFunction extends ProcessWindowFunction[CoilMe
 }
 
 
-class AggregateMeasurementValuesWindowFunction extends ProcessWindowFunction[CoilMeasurement, LassoStreamEvent, Int, TimeWindow] {
-  override def process(key: Int, context: Context, in: Iterable[CoilMeasurement], out: Collector[LassoStreamEvent]): Unit = {
+class AggregateMeasurementValuesWindowFunction extends ProcessWindowFunction[CoilMeasurement, LassoStreamEvent, (Int, Double), TimeWindow] {
+  override def process(key:(Int, Double), context: Context, in: Iterable[CoilMeasurement], out: Collector[LassoStreamEvent]): Unit = {
 
 
     val iter = in.toList
@@ -99,8 +99,18 @@ class LassoOperation(
     featureCount: Int, rangePartitioning: Boolean,
     allowedLateness: Long, iterationWaitTime: Long) extends Serializable {
 
+  def getKeyByCoilAndX(mesurement: CoilMeasurement): (Int, Double) = {
+    val xCoord = mesurement match {
+      case s1d: SensorMeasurement1D => s1d.x
+      case s2d: SensorMeasurement2D => s2d.x
+    }
+    (mesurement.coilId, xCoord)
+    //mesurement.coilId
+  }
+
   /**
     * Launch the Lasso operation for a given variable.
+    *
     * @param measurementStream The input measurements stream.
     * @param flatnessStream The input flatness values stream.
     * @return A data stream of [[LassoResult]].
@@ -116,14 +126,14 @@ class LassoOperation(
         rangePartitioning, iterationWaitTime, allowedLateness)
     }
 
-    val processedFlatnessStream = flatnessStream.filter(x => x.slice.head == varId).keyBy(x => x.coilId)
+    val processedFlatnessStream = flatnessStream.filter(x => x.slice.head == varId)
+      .keyBy(x => x.coilId)
       .window(ProcessingTimeSessionWindows.withGap(Time.seconds(allowedLateness)))
       .process(new AggregateFlatnessValuesWindowFunction())
 
-    val processedMeasurementStream = measurementStream.keyBy(x => x.coilId)
+    val processedMeasurementStream = measurementStream.keyBy(x => getKeyByCoilAndX(x))
       .window(ProcessingTimeSessionWindows.withGap(Time.seconds(allowedLateness)))
       .process(new AggregateMeasurementValuesWindowFunction())
-
     val connectedStreams = processedMeasurementStream.connect(processedFlatnessStream)
 
     val allEvents = connectedStreams.flatMap(new CoFlatMapFunction[LassoStreamEvent,
