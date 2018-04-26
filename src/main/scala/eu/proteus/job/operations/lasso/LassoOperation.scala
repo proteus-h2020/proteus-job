@@ -66,7 +66,7 @@ class AggregateFlatnessValuesWindowFunction extends ProcessWindowFunction[CoilMe
 }
 
 
-class AggregateMeasurementValuesWindowFunction extends ProcessWindowFunction[CoilMeasurement, LassoStreamEvent, (Int, Double), TimeWindow] {
+class AggregateMeasurementValuesWindowFunction(val featureCount: Int) extends ProcessWindowFunction[CoilMeasurement, LassoStreamEvent, (Int, Double), TimeWindow] {
   override def process(key:(Int, Double), context: Context, in: Iterable[CoilMeasurement], out: Collector[LassoStreamEvent]): Unit = {
 
 
@@ -78,7 +78,7 @@ class AggregateMeasurementValuesWindowFunction extends ProcessWindowFunction[Coi
 
     // TODO: pass the featureCount parameter to this function ?¿
     // val breezeVector = BreezeVector.zeros[Double](featureCount)
-    val breezeVector = BreezeVector.zeros[Double](76)
+    val breezeVector = BreezeVector.zeros[Double](featureCount)
 
     iter.foreach(measure => {
       breezeVector(measure.slice.head) = measure.data.head._2
@@ -105,7 +105,6 @@ class LassoOperation(
       case s2d: SensorMeasurement2D => s2d.x
     }
     (mesurement.coilId, xCoord)
-    //mesurement.coilId
   }
 
   /**
@@ -133,7 +132,7 @@ class LassoOperation(
 
     val processedMeasurementStream = measurementStream.keyBy(x => getKeyByCoilAndX(x))
       .window(ProcessingTimeSessionWindows.withGap(Time.seconds(allowedLateness)))
-      .process(new AggregateMeasurementValuesWindowFunction())
+      .process(new AggregateMeasurementValuesWindowFunction(featureCount))
     val connectedStreams = processedMeasurementStream.connect(processedFlatnessStream)
 
     val allEvents = connectedStreams.flatMap(new CoFlatMapFunction[LassoStreamEvent,
