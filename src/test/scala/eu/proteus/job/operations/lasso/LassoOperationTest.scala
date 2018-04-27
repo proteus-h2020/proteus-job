@@ -43,12 +43,13 @@ class LassoOperationTest extends FunSuite with Matchers {
     val pullLimit = 10000
     val featureCount = 76
     val rangePartitioning = true
-    val allowedLateness = 10000
+    val allowedFlatnessLateness = 10000
+    val allowedRealtimeLateness = 10000
     val iterationWaitTime: Long = 10000
     val varName = "C0000"
 
     val operation = new LassoOperation(varName, workerParallelism, psParallelism, pullLimit, featureCount,
-      rangePartitioning, allowedLateness, iterationWaitTime)
+      rangePartitioning, allowedFlatnessLateness, allowedRealtimeLateness,iterationWaitTime)
 
     operation
   }

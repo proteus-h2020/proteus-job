@@ -97,7 +97,7 @@ class LassoOperation(
     targetVariable: String, workerParallelism: Int,
     psParallelism: Int, pullLimit: Int,
     featureCount: Int, rangePartitioning: Boolean,
-    allowedLateness: Long, iterationWaitTime: Long) extends Serializable {
+    allowedFlatnessLateness: Long, allowedRealtimeLateness: Long, iterationWaitTime: Long) extends Serializable {
 
   def getKeyByCoilAndX(mesurement: CoilMeasurement): (Int, Double) = {
     val xCoord = mesurement match {
@@ -122,16 +122,16 @@ class LassoOperation(
 
     implicit def transformStreamImplementation[T <: LassoStreamEvent] = {
       new LassoDFStreamTransformOperation[T](workerParallelism, psParallelism, pullLimit, featureCount,
-        rangePartitioning, iterationWaitTime, allowedLateness)
+        rangePartitioning, iterationWaitTime, allowedFlatnessLateness)
     }
 
     val processedFlatnessStream = flatnessStream.filter(x => x.slice.head == varId)
       .keyBy(x => x.coilId)
-      .window(ProcessingTimeSessionWindows.withGap(Time.seconds(allowedLateness)))
+      .window(ProcessingTimeSessionWindows.withGap(Time.seconds(allowedFlatnessLateness)))
       .process(new AggregateFlatnessValuesWindowFunction())
 
     val processedMeasurementStream = measurementStream.keyBy(x => getKeyByCoilAndX(x))
-      .window(ProcessingTimeSessionWindows.withGap(Time.seconds(allowedLateness)))
+      .window(ProcessingTimeSessionWindows.withGap(Time.seconds(allowedRealtimeLateness)))
       .process(new AggregateMeasurementValuesWindowFunction(featureCount))
     val connectedStreams = processedMeasurementStream.connect(processedFlatnessStream)
 

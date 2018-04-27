@@ -232,13 +232,14 @@ object ProteusJob {
       val pullLimit = parameters.getRequired("lasso-pull-limit").toInt
       val featureCount = parameters.getRequired("lasso-features").toInt
       val rangePartitioning = parameters.getRequired("lasso-range-partitioning").toBoolean
-      val allowedLateness = parameters.getRequired("lasso-allowed-lateness").toInt
+      val allowedFlatnessLateness = parameters.getRequired("lasso-flatness-allowed-lateness").toInt
+      val allowedRealtimeLateness = parameters.getRequired("lasso-realtime-allowed-lateness").toInt
       val iterationWaitTime: Long = parameters.getRequired("lasso-iteration-wait-time").toLong
 
       variables.foreach{
         varName =>
           val lassoJob = new LassoOperation(varName, workerParallelism, psParallelism, pullLimit, featureCount,
-            rangePartitioning, allowedLateness, iterationWaitTime)
+            rangePartitioning, allowedFlatnessLateness, allowedRealtimeLateness, iterationWaitTime)
 
           val lassoJobResult = lassoJob.runLasso(realtimeSource, flatnessSource)
           LassoJobs.put(varName, lassoJob)
@@ -276,7 +277,8 @@ object ProteusJob {
     System.out.println("--lasso-pull-limit\tPull limit")
     System.out.println("--lasso-features\tNumber of features")
     System.out.println("--lasso-range-partitioning\tRange partitioning (boolean)")
-    System.out.println("--lasso-allowed-lateness\tAllowed lateness")
+    System.out.println("--lasso-flatness-allowed-lateness\tAllowed flatness lateness")
+    System.out.println("--lasso-realtime-allowed-lateness\tAllowed realtime lateness")
     System.out.println("--lasso-iteration-wait-time\tIteration wait time")
   }
 
