@@ -65,14 +65,51 @@ class AggregateFlatnessValuesWindowFunction extends ProcessWindowFunction[CoilMe
 
 }
 
+
+class AggregateMeasurementValuesWindowFunction(val featureCount: Int) extends ProcessWindowFunction[CoilMeasurement, LassoStreamEvent, (Int, Double), TimeWindow] {
+  override def process(key:(Int, Double), context: Context, in: Iterable[CoilMeasurement], out: Collector[LassoStreamEvent]): Unit = {
+
+
+    val iter = in.toList
+    val xCoord = iter.head match {
+      case s1d: SensorMeasurement1D => s1d.x
+      case s2d: SensorMeasurement2D => s2d.x
+    }
+
+    // TODO: pass the featureCount parameter to this function ?¿
+    // val breezeVector = BreezeVector.zeros[Double](featureCount)
+    val breezeVector = BreezeVector.zeros[Double](featureCount)
+
+    iter.foreach(measure => {
+      breezeVector(measure.slice.head) = measure.data.head._2
+    })
+
+    val vector = new DenseVector(breezeVector.toArray)
+
+    val sensor: SensorMeasurement = SensorMeasurement((iter.head.coilId, xCoord), in.head.slice, vector)
+    val ev: StreamEventWithPos[(Long, Double)] = sensor
+
+    out.collect(Left(ev))
+  }
+}
+
 class LassoOperation(
     targetVariable: String, workerParallelism: Int,
     psParallelism: Int, pullLimit: Int,
     featureCount: Int, rangePartitioning: Boolean,
-    allowedLateness: Long, iterationWaitTime: Long) extends Serializable {
+    allowedFlatnessLateness: Long, allowedRealtimeLateness: Long, iterationWaitTime: Long) extends Serializable {
+
+  def getKeyByCoilAndX(mesurement: CoilMeasurement): (Int, Double) = {
+    val xCoord = mesurement match {
+      case s1d: SensorMeasurement1D => s1d.x
+      case s2d: SensorMeasurement2D => s2d.x
+    }
+    (mesurement.coilId, xCoord)
+  }
 
   /**
     * Launch the Lasso operation for a given variable.
+    *
     * @param measurementStream The input measurements stream.
     * @param flatnessStream The input flatness values stream.
     * @return A data stream of [[LassoResult]].
@@ -85,30 +122,17 @@ class LassoOperation(
 
     implicit def transformStreamImplementation[T <: LassoStreamEvent] = {
       new LassoDFStreamTransformOperation[T](workerParallelism, psParallelism, pullLimit, featureCount,
-        rangePartitioning, iterationWaitTime, allowedLateness)
+        rangePartitioning, iterationWaitTime, allowedFlatnessLateness)
     }
 
-    val processedFlatnessStream = flatnessStream.filter(x => x.slice.head == varId).keyBy(x => x.coilId)
-      .window(ProcessingTimeSessionWindows.withGap(Time.seconds(allowedLateness)))
-      //.window(TumblingEventTimeWindows.of(Time.seconds(5)))
+    val processedFlatnessStream = flatnessStream.filter(x => x.slice.head == varId)
+      .keyBy(x => x.coilId)
+      .window(ProcessingTimeSessionWindows.withGap(Time.seconds(allowedFlatnessLateness)))
       .process(new AggregateFlatnessValuesWindowFunction())
 
-    def toLassoStreamEvent(in: CoilMeasurement): LassoStreamEvent = {
-      val coilID = in.coilId
-      val xCoord = in match {
-        case s1d: SensorMeasurement1D => s1d.x
-        case s2d: SensorMeasurement2D => s2d.x
-      }
-      val breezeVector = BreezeVector.zeros[Double](featureCount)
-      breezeVector(in.slice.head) = in.data.head._2
-      val vector = new DenseVector(breezeVector.toArray)
-      val slice = in.slice
-      val ev: StreamEventWithPos[(Long, Double)] = SensorMeasurement((coilID, xCoord), slice, vector)
-      Left(ev)
-    }
-
-    val processedMeasurementStream = measurementStream.map{x => toLassoStreamEvent(x)}
-
+    val processedMeasurementStream = measurementStream.keyBy(x => getKeyByCoilAndX(x))
+      .window(ProcessingTimeSessionWindows.withGap(Time.seconds(allowedRealtimeLateness)))
+      .process(new AggregateMeasurementValuesWindowFunction(featureCount))
     val connectedStreams = processedMeasurementStream.connect(processedFlatnessStream)
 
     val allEvents = connectedStreams.flatMap(new CoFlatMapFunction[LassoStreamEvent,

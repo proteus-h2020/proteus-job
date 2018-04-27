@@ -133,12 +133,13 @@ class LassoITSuite
     val pullLimit = 10
     val featureCount = 76
     val rangePartitioning = true
-    val allowedLateness = 10
+    val allowedFlatnessLateness = 10
+    val allowedRealtimeLateness = 25
     val iterationWaitTime: Long = 20000
     val varName = "C0028"
 
     val operation = new LassoOperation(varName, workerParallelism, psParallelism, pullLimit, featureCount,
-      rangePartitioning, allowedLateness, iterationWaitTime)
+      rangePartitioning, allowedFlatnessLateness, allowedRealtimeLateness, iterationWaitTime)
 
     val result = operation.runLasso(consumingMeasurement, consumingFlatness)
 
