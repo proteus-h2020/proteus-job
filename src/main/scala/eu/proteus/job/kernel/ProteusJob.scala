@@ -66,9 +66,8 @@ object ProteusJob {
 
   // kafka config
   private [kernel] var kafkaBootstrapServer = "localhost:2181"
-  // private [kernel] var realtimeDataKafkaTopic = "proteus-realtime"
   private [kernel] var realtimeDataKafkaTopic = "proteus-realtime"
-  // private [kernel] var flatnessDataKafkaTopic = "proteus-flatness"
+  private [kernel] var processedRealtimeDataKafkaTopic = "proteus-processed-realtime"
   private [kernel] var flatnessDataKafkaTopic = "proteus-flatness"
   private [kernel] var jobStackBackendType = "memory"
 
@@ -83,13 +82,11 @@ object ProteusJob {
   def loadBaseKafkaProperties = {
     val properties = new Properties
     properties.setProperty("bootstrap.servers", kafkaBootstrapServer)
-//    properties.setProperty("group.id", "proteus-group")
     properties
   }
 
   def loadConsumerKafkaProperties = {
     val properties = loadBaseKafkaProperties
-//    properties.setProperty("auto.offset.reset", "earliest")
     properties
   }
 
@@ -161,26 +158,27 @@ object ProteusJob {
 
     val env = StreamExecutionEnvironment.getExecutionEnvironment
 
-    // create the job
     configureFlinkEnv(env)
 
-    // type info & serializer
     implicit val inputTypeInfo = createTypeInformation[CoilMeasurement]
     val inputSchema = new UntaggedObjectSerializationSchema[CoilMeasurement](env.getConfig)
-
-    // add kafka realtimeSource
 
     val realtimeSource: DataStream[CoilMeasurement] = env.addSource(new FlinkKafkaConsumer010[CoilMeasurement](
         realtimeDataKafkaTopic,
         inputSchema,
         loadConsumerKafkaProperties))
 
-    // add kafka flatnessSource
-
     val flatnessSource: DataStream[CoilMeasurement] = env.addSource(new FlinkKafkaConsumer010[CoilMeasurement](
         flatnessDataKafkaTopic,
         inputSchema,
         loadConsumerKafkaProperties))
+
+    LOG.info("Processed real-time output topic: processed-real-time")
+    val realtimeSinkSchema = new UntaggedObjectSerializationSchema[CoilMeasurement](env.getConfig)
+    val producerCfg = FlinkKafkaProducer010.writeToKafkaWithTimestamps(realtimeSource.javaStream,
+      processedRealtimeDataKafkaTopic, realtimeSinkSchema, loadBaseKafkaProperties)
+    producerCfg.setLogFailuresOnly(false)
+    producerCfg.setFlushOnCheckpoint(true)
 
     // simple moments
     if(ProteusJob.LinkMoments){
@@ -188,22 +186,18 @@ object ProteusJob {
       val moments = MomentsOperation.runSimpleMomentsAnalytics(realtimeSource, 54)
       implicit val momentsTypeInfo = createTypeInformation[MomentsResult]
       val momentsSinkSchema = new UntaggedObjectSerializationSchema[MomentsResult](env.getConfig)
-
       val producerCfg = FlinkKafkaProducer010.writeToKafkaWithTimestamps(
         moments.javaStream,
         "simple-moments",
         momentsSinkSchema,
         loadBaseKafkaProperties)
-
       producerCfg.setLogFailuresOnly(false)
       producerCfg.setFlushOnCheckpoint(true)
     }
 
     if(ProteusJob.LinkSAX){
-
       val variables = parameters.getRequired("sax-variable").split(",")
       val saxSinkSchema = new UntaggedObjectSerializationSchema[SAXResult](env.getConfig)
-
       variables.foreach(varName => {
         val saxJob = new SAXOperation(
           parameters.getRequired("sax-model-storage-path"),
@@ -219,14 +213,11 @@ object ProteusJob {
         outputProducer.setLogFailuresOnly(false)
         outputProducer.setFlushOnCheckpoint(true)
       })
-
-      // Console.println("ThePlan:" + env.getExecutionPlan)
     }
 
     if(ProteusJob.LinkLasso){
       val variables = parameters.getRequired("lasso-variable").split(",")
       val lassoSinkSchema = new UntaggedObjectSerializationSchema[LassoResult](env.getConfig)
-
       val workerParallelism = parameters.getRequired("lasso-workers").toInt
       val psParallelism = parameters.getRequired("lasso-ps").toInt
       val pullLimit = parameters.getRequired("lasso-pull-limit").toInt
@@ -240,7 +231,6 @@ object ProteusJob {
         varName =>
           val lassoJob = new LassoOperation(varName, workerParallelism, psParallelism, pullLimit, featureCount,
             rangePartitioning, allowedFlatnessLateness, allowedRealtimeLateness, iterationWaitTime)
-
           val lassoJobResult = lassoJob.runLasso(realtimeSource, flatnessSource)
           LassoJobs.put(varName, lassoJob)
           val outputProducer = FlinkKafkaProducer010.writeToKafkaWithTimestamps(
@@ -254,7 +244,6 @@ object ProteusJob {
 
     }
 
-    // execute the job
     env.execute("The Proteus Job")
   }
 

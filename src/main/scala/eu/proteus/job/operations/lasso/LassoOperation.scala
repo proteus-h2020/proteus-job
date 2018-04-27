@@ -66,8 +66,10 @@ class AggregateFlatnessValuesWindowFunction extends ProcessWindowFunction[CoilMe
 }
 
 
-class AggregateMeasurementValuesWindowFunction(val featureCount: Int) extends ProcessWindowFunction[CoilMeasurement, LassoStreamEvent, (Int, Double), TimeWindow] {
-  override def process(key:(Int, Double), context: Context, in: Iterable[CoilMeasurement], out: Collector[LassoStreamEvent]): Unit = {
+class AggregateMeasurementValuesWindowFunction(val featureCount: Int) extends ProcessWindowFunction[CoilMeasurement,
+  LassoStreamEvent, (Int, Double), TimeWindow] {
+  override def process(key:(Int, Double), context: Context, in: Iterable[CoilMeasurement],
+                       out: Collector[LassoStreamEvent]): Unit = {
 
 
     val iter = in.toList
