@@ -44,12 +44,12 @@ class MomentsResultKryoSerializer
 
     val mean = input.readDouble()
     val variance = input.readDouble()
-    val counter = input.readDouble()
+    val counter = input.readLong()
 
     if (mtype == MOMENTS_RESULT_2D) {
-      MomentsResult2D(coilId, varId, x, y, mean, variance, counter)
+      MomentsResult2D(coilId, varId, x, y, mean, variance, counter.toDouble)
     } else if (mtype == MOMENTS_RESULT_1D) {
-      MomentsResult1D(coilId, varId, x, mean, variance, counter)
+      MomentsResult1D(coilId, varId, x, mean, variance, counter.toDouble)
     } else {
       throw new UnsupportedOperationException
     }
@@ -77,7 +77,7 @@ class MomentsResultKryoSerializer
 
     output.writeDouble(obj.mean)
     output.writeDouble(obj.variance)
-    output.writeDouble(obj.counter)
+    output.writeLong(obj.counter.longValue)
 
   }
 }
